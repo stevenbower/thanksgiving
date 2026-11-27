@@ -241,7 +241,7 @@ window.addEventListener('keydown', e => {
   if (k === 'm') toggleMute();
 });
 window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.down = false; if (state === 'play') togglePause(); });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.down = false; if (state === 'play' && !NET) togglePause(); });
 
 cv.addEventListener('contextmenu', e => e.preventDefault());
 let hudSlots = []; // tappable weapon/bomb slots, filled by drawHUD
@@ -252,7 +252,7 @@ cv.addEventListener('pointerdown', e => {
   Sfx.unlock();
   if (state === 'play') {
     const slot = hudSlotAt(e.clientX, e.clientY);
-    if (slot) { if (slot.k === 'bomb') wantBomb = true; else if (slot.k === 'special') wantSpecial = true; else if (slot.k !== 'info') selectWeapon(slot.k); return; }
+    if (slot) { if (slot.k === 'bomb') wantBomb = true; else if (slot.k === 'special') wantSpecial = true; else if (slot.k !== 'info') wantWeapon = slot.k; return; }
   }
   mouse.active = true; mouse.x = e.clientX; mouse.y = e.clientY;
   if (e.button === 0) mouse.down = true;
@@ -269,7 +269,7 @@ cv.addEventListener('touchstart', e => {
     const x = t.clientX, y = t.clientY;
     if (state === 'play') {
       const slot = hudSlotAt(x, y);
-      if (slot) { if (slot.k === 'bomb') wantBomb = true; else if (slot.k === 'special') wantSpecial = true; else if (slot.k !== 'info') selectWeapon(slot.k); continue; }
+      if (slot) { if (slot.k === 'bomb') wantBomb = true; else if (slot.k === 'special') wantSpecial = true; else if (slot.k !== 'info') wantWeapon = slot.k; continue; }
     }
     const s = { id: t.identifier, ox: x, oy: y, x, y };
     if (x < VW * 0.5) { if (!sticks.move) sticks.move = s; }
@@ -322,15 +322,20 @@ let state = 'title';
 let selected = store.get('tg_char', 'grandpa');
 const names = Object.fromEntries(CHAR_ORDER.map(k => [k, CHARS[k].name])); // fixed names (renaming was removed)
 let tableT = 8, corpses = [], webs = [], roasts = [], cans = [], acids = [], flames = [];
-let player, enemies, bullets, ebullets, bombs, particles, puddles, pickups, floaters, props, spawnQueue;
+// player = the player currently being simulated/drawn (the "actor"); me = this device's player; players = everyone
+let player, me, players = [], enemies, bullets, ebullets, bombs, particles, puddles, pickups, floaters, props, spawnQueue;
+let NET = null; // null = single player; otherwise { room, host: bool, roster, ... } (see the multiplayer section)
+let nextId = 1;
+const NP = () => Math.max(1, players.length);
 let wave, waveState, waveTimer, score, kills, shake, time, banner, boss, hitStop;
 const cam = { x: ARENA.w / 2, y: ARENA.h / 2 };
 
-function newGame() {
-  const c = CHARS[selected];
-  player = {
-    x: ARENA.w / 2, y: ARENA.h / 2 + 120, vx: 0, vy: 0, z: 0, vz: 0, r: 20, h: 96,
-    hp: c.hp, maxHp: c.hp, speed: c.speed, ch: selected,
+function makePlayer(ch, id, pname, idx, n) {
+  const c = CHARS[ch], a = n > 1 ? -Math.PI / 2 + (idx - (n - 1) / 2) * 0.7 : Math.PI / 2;
+  return {
+    id, pname, isPlayer: true, input: blankInput(),
+    x: ARENA.w / 2 + (n > 1 ? Math.cos(a) * 130 : 0), y: ARENA.h / 2 + 120 + (n > 1 ? Math.sin(a) * 60 + 60 : 0), vx: 0, vy: 0, z: 0, vz: 0, r: 20, h: 96,
+    hp: c.hp, maxHp: c.hp, speed: c.speed, ch,
     ammo: { gravy: Infinity, cran: 20, corn: c.startCorn || 0, pie: c.startPie || 0 },
     cur: c.startCorn ? 'corn' : c.startPie ? 'pie' : 'gravy',
     bombs: c.bombs || 3, fireCd: 0, dashCd: 0, dashT: 0, dashDir: [0, 0], inv: 0,
@@ -340,11 +345,19 @@ function newGame() {
     lastFire: 9, lean: 0, leanV: 0, sq: 0, sqV: 0, hurtT: 0, victoryT: 0, dead: false, deadT: 0, gunAng: Math.PI / 2,
     scraps: 0, macT: 0, prevWeapon: 'gravy', chargeCd: 0, chargeWind: 0, chargeT: 0, chargeDir: [1, 0], chargeTarget: null, lastTaunt: -9, speech: null, roastCd: 0, roastFlash: 0, canCd: 0, stompCd: 0, stompWind: 0, jumpT: 0, slimeCd: 0, chiliCd: 0, chewT: 0, breathT: 0,
   };
-  enemies = []; bullets = []; ebullets = []; bombs = []; particles = []; puddles = []; pickups = []; floaters = []; corpses = []; webs = []; roasts = []; cans = []; acids = []; flames = []; tableT = 8;
+}
+// roster: [{ id, name, ch }] (single player: just this device)
+function newGame(roster, myId) {
+  roster = roster || [{ id: 'me', name: playerName(), ch: selected }];
+  players = roster.map((r, i) => makePlayer(r.ch, r.id, r.name, i, roster.length));
+  me = players.find(p => p.id === (myId || 'me')) || players[0];
+  player = me;
+  nextId = 1;
+  enemies = []; bullets = []; ebullets = []; bombs = []; particles = []; puddles = []; pickups = []; floaters = []; corpses = []; webs = []; roasts = []; cans = []; acids = []; flames = []; fireParts = []; smokeParts = []; tableT = 8;
   initYard();
   spawnQueue = []; wave = Math.max(0, (testLevel || parseInt(new URLSearchParams(location.search).get('wave')) || 1) - 1); score = 0; kills = 0; shake = 0; time = 0; banner = null; boss = null; hitStop = 0;
   props = makeProps();
-  cam.x = player.x; cam.y = player.y;
+  cam.x = me.x; cam.y = me.y;
   startWave();
 }
 
@@ -477,7 +490,7 @@ function initYard() {
 
 function movers() {
   const m = [];
-  if (player && !player.dead && player.z < 8) m.push(player);
+  for (const q of players) if (!q.dead && q.z < 8) m.push(q);
   for (const e of enemies) if (!e.dead && e.spawnT <= 0 && e.z < 8 && !e.d.boss) m.push(e); else if (e.d.boss && !e.dead && e.z < 8) m.push(e);
   return m;
 }
@@ -518,7 +531,7 @@ function updateYard(dt) {
         const msp = Math.hypot(m.vx, m.vy), nx = dx / d, ny = dy / d;
         g.x = m.x + nx * rr; g.y = m.y + ny * rr / 1.3;
         if (msp > 40 && g.regrow > 0.6) {
-          const kick = m === player ? 1.6 : (m.mass || 1) * 0.6;
+          const kick = m.isPlayer ? 1.6 : (m.mass || 1) * 0.6;
           g.vx = m.vx * kick + nx * 140; g.vy = m.vy * kick + ny * 100; g.vz = 120 + msp * 0.45; Sfx.thump();
           particles.push({ x: g.x, y: g.y, z: 2, vx: rand(-40, 40), vy: rand(-20, 20), vz: rand(30, 80), life: 0.4, max: 0.4, color: 'rgba(120,90,50,.8)', size: rand(4, 7), grav: 300 });
         }
@@ -535,7 +548,7 @@ function updateYard(dt) {
     // a hard-kicked pumpkin SMASHES into enemies
     if (sp > 230) for (const e of enemies) {
       if (e.dead || e.spawnT > 0) continue;
-      if ((e.x - g.x) ** 2 + ((e.y - g.y) * 1.3) ** 2 < (e.r + g.r) ** 2) { damageEnemy(e, 22 + wave * 2, g.vx / sp, g.vy / sp, 320); smashGourd(g); floatText(e.x, e.y - e.h - 20, 'SQUASH!', '#ff9a3a', 0.8, 22); break; }
+      if ((e.x - g.x) ** 2 + ((e.y - g.y) * 1.3) ** 2 < (e.r + g.r) ** 2) { if (!(NET && !NET.host)) damageEnemy(e, 22 + wave * 2, g.vx / sp, g.vy / sp, 320); smashGourd(g); floatText(e.x, e.y - e.h - 20, 'SQUASH!', '#ff9a3a', 0.8, 22); break; }
     }
     if (!g.dead && inPond(g.x, g.y) && sp > 30) splashAt(g.x, g.y, 0.5);
   }
@@ -554,8 +567,8 @@ function updateYard(dt) {
   for (const c of cattails) bend(c, 22, 6);
   // --- wading: splashes, ripples and slowdown are applied where things move
   for (const m of M) {
-    if (!inPond(m.x, m.y)) { if (m === player && player.wetT > 0) player.wetT -= dt; continue; }
-    if (m === player) player.wetT = 3;
+    if (!inPond(m.x, m.y)) { if (m.isPlayer && m.wetT > 0) m.wetT -= dt; continue; }
+    if (m.isPlayer) m.wetT = 3;
     const sp = Math.hypot(m.vx, m.vy);
     m.splashT = (m.splashT || 0) - dt;
     if (sp > 30 && m.splashT <= 0) { m.splashT = 0.16; splashAt(m.x, m.y, Math.min(1.4, sp / 220) * (m.r / 22)); }
@@ -704,21 +717,157 @@ function drawRock(pr) {
   ctx.restore();
 }
 
+// ---------- realistic fire: soft additive flame particles that rise, sway, shrink and cool white -> yellow -> orange -> red,
+// with a glowing coal bed, popping embers, curling smoke and flickering light. Used by the fire pit and anything burning.
+let fireParts = [], smokeParts = [], fireSpr = null, pitAcc = 0;
+function makeFireSprites() {
+  const ramp = [[255, 215, 120], [255, 190, 80], [255, 155, 45], [250, 115, 25], [225, 75, 15], [180, 45, 10], [120, 25, 8], [70, 14, 5]]; // little blue: overlaps saturate to yellow, never white
+  const mk = (r, g, b, soft) => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+    const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, `rgba(${r},${g},${b},1)`); gr.addColorStop(soft, `rgba(${r},${g},${b},.55)`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return c; };
+  const flame = [];
+  for (let i = 0; i < 24; i++) { // smooth colour ramp, 24 steps
+    const f = i / 23 * (ramp.length - 1), k = Math.floor(f), t = f - k, A = ramp[k], B = ramp[Math.min(ramp.length - 1, k + 1)];
+    flame.push(mk(...A.map((v, j) => Math.round(v + (B[j] - v) * t)), 0.35));
+  }
+  const smoke = document.createElement('canvas'); smoke.width = smoke.height = 64;
+  { const x = smoke.getContext('2d'); for (let i = 0; i < 5; i++) { const cx = 32 + Math.cos(i * 1.3) * 9, cy = 32 + Math.sin(i * 1.3) * 7, gr = x.createRadialGradient(cx, cy, 0, cx, cy, 22);
+      gr.addColorStop(0, 'rgba(38,34,32,.6)'); gr.addColorStop(1, 'rgba(38,34,32,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); } }
+  fireSpr = { flame, smoke, ember: mk(255, 200, 120, 0.2) };
+}
+// one tongue of flame. heat 0..1 picks how hot it starts; it cools as it rises
+function emitFlame(x, y, z, size, o = {}) {
+  if (fireParts.length > 900) return;
+  const life = (o.life || 0.75) * rand(0.7, 1.15);
+  fireParts.push({ x, y, z, vx: (o.vx || 0) + rand(-14, 14), vz: rand(50, 95) * (o.lift || 1), size, life, max: life, ph: rand(0, 6.3), heat: o.heat ?? rand(0, 0.18) });
+}
+function emitEmber(x, y, z, vx = 0) {
+  if (fireParts.length > 900) return;
+  const life = rand(0.8, 1.8);
+  fireParts.push({ x, y, z, vx: vx + rand(-50, 50), vz: rand(90, 220), size: rand(1.6, 3), life, max: life, ph: rand(0, 6.3), ember: true });
+}
+function emitSmoke(x, y, z, size = 14, dark = 0.3) {
+  if (smokeParts.length > 160) return;
+  const life = rand(1.8, 3);
+  smokeParts.push({ x, y, z, vx: rand(-8, 8), vz: rand(28, 50), size, life, max: life, a: dark, rot: rand(0, 6.3), vr: rand(-0.6, 0.6) });
+}
+function updateFire(dt) {
+  if (!fireSpr) makeFireSprites();
+  // the fire pit: a steady bed of flames, gusting
+  const [px, py] = MAP.firepit, gust = 0.75 + 0.25 * Math.sin(time * 1.7) * Math.sin(time * 2.9 + 1);
+  pitAcc += dt * 75 * gust;
+  while (pitAcc > 1) { pitAcc--; const u = rand(-1, 1), edge = Math.abs(u); emitFlame(px + u * 26, py + rand(-5, 5), 4 + rand(0, 4), rand(22, 34) * (1 - edge * 0.4), { life: 1.15 * (1 - edge * 0.4), lift: 1.4, heat: rand(0, 0.25) + edge * 0.15 }); }
+  if (Math.random() < dt * 3.5) emitEmber(px + rand(-20, 20), py, 20);
+  if (Math.random() < dt * 5) emitSmoke(px + rand(-12, 12), py, rand(50, 70), rand(12, 18), 0.22);
+  if (Math.random() < dt * 0.6) { for (let i = 0; i < 6; i++) emitEmber(px + rand(-10, 10), py, 14, rand(-40, 40)); } // a log pops
+  // anything burning sheds flames from all over its body; they trail behind as it runs
+  for (const e of enemies) {
+    if (!(e.burnT > 0) || e.dead) continue;
+    // how fast it's running (from its last position) so the flames stream out behind it
+    const mvx = e.lfx === undefined ? 0 : clamp((e.x - e.lfx) / Math.max(dt, 1e-3), -600, 600); e.lfx = e.x; e.fvx = mvx;
+    const k = Math.min(1, e.burnT / 0.6), area = e.r * e.h / 1800;
+    e.fireAcc = (e.fireAcc || 0) + dt * 38 * k * Math.min(2.2, Math.max(0.8, area));
+    while (e.fireAcc > 1) { e.fireAcc--;
+      const a = rand(0, 6.3), rr = Math.sqrt(Math.random()), hz = Math.pow(Math.random(), 0.8);
+      emitFlame(e.x + Math.cos(a) * e.r * 0.75 * rr, e.y + 2, e.z + e.h * (0.08 + hz * 0.72), rand(18, 28) * Math.min(1.6, 0.7 + e.r / 60), { vx: -mvx * 0.45, life: 0.6, heat: rand(0.05, 0.3) });
+    }
+    if (Math.random() < dt * 4 * k) emitEmber(e.x + rand(-e.r, e.r) * 0.5, e.y, e.z + e.h * 0.6, -mvx * 0.3);
+    if (Math.random() < dt * 6 * k) emitSmoke(e.x + rand(-10, 10), e.y, e.z + e.h * 0.95, rand(10, 16), 0.32);
+  }
+  for (const p of fireParts) {
+    p.life -= dt;
+    const t = 1 - p.life / p.max;
+    // buoyancy plus a turbulent sideways lick; flames speed up as they rise
+    p.vz += (p.ember ? -60 : 160) * dt;
+    p.vx += Math.sin(time * 7 + p.ph + p.z * 0.06) * (p.ember ? 260 : 120) * dt + 10 * dt;
+    p.vx *= Math.exp(-dt * (p.ember ? 1 : 3));
+    p.x += p.vx * dt; p.z += p.vz * dt;
+  }
+  fireParts = fireParts.filter(p => p.life > 0);
+  for (const s of smokeParts) { s.life -= dt; s.x += (s.vx + 14) * dt; s.z += s.vz * dt; s.vz *= Math.exp(-dt * 0.4); s.rot += s.vr * dt; }
+  smokeParts = smokeParts.filter(s => s.life > 0);
+}
+// ground layer: glowing coals and warm light that flickers on the grass
 function drawFirepitFlames() {
-  const [x, y] = MAP.firepit;
+  const [x, y] = MAP.firepit, fl = 0.8 + Math.sin(time * 11) * 0.08 + Math.sin(time * 23 + 1) * 0.06 + Math.sin(time * 3.1) * 0.06;
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 7; i++) {
-    const fx = x + (i - 3) * 7, fl = (Math.sin(time * 13 + i * 2.1) + 1) / 2, fh = 26 + fl * 22 - Math.abs(i - 3) * 5;
-    for (const [col, sc] of [['rgba(255,90,20,.5)', 1], ['rgba(255,190,50,.55)', 0.6], ['rgba(255,250,200,.6)', 0.28]]) {
-      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(fx - 9 * sc, y - 4);
-      ctx.quadraticCurveTo(fx - 6 * sc, y - 4 - fh * sc * 0.6, fx + Math.sin(time * 7 + i) * 3, y - 4 - fh * sc);
-      ctx.quadraticCurveTo(fx + 6 * sc, y - 4 - fh * sc * 0.6, fx + 9 * sc, y - 4); ctx.closePath(); ctx.fill();
+  const g = ctx.createRadialGradient(x, y, 5, x, y, 170 * fl); g.addColorStop(0, `rgba(255,140,50,${0.3 * fl})`); g.addColorStop(0.4, `rgba(255,110,30,${0.12 * fl})`); g.addColorStop(1, 'rgba(255,100,30,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, 170 * fl, 110 * fl, 0, 0, Math.PI * 2); ctx.fill();
+  // coal bed: pulsing hot spots
+  for (let i = 0; i < 9; i++) {
+    const cx = x + Math.cos(i * 2.39) * 22 * ((i % 3) / 2 + 0.3), cy = y - 2 + Math.sin(i * 2.39) * 8, p = 0.55 + 0.45 * Math.sin(time * (2 + i * 0.7) + i);
+    const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, 12); cg.addColorStop(0, `rgba(255,${150 + p * 80 | 0},60,${0.55 * p})`); cg.addColorStop(1, 'rgba(255,60,10,0)');
+    ctx.fillStyle = cg; ctx.beginPath(); ctx.ellipse(cx, cy, 12, 6, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+// the warm flicker a burning body casts on itself and the ground
+function drawBurning(e) {
+  const k = Math.min(1, e.burnT / 0.6), fl = 0.75 + Math.sin(e.t * 19) * 0.12 + Math.sin(e.t * 31 + e.seed) * 0.1;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const gx = e.x, gy = e.y - e.z - e.h * 0.45, R = Math.max(e.r * 1.6, e.h * 0.6);
+  const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, R); g.addColorStop(0, `rgba(255,120,30,${0.32 * k * fl})`); g.addColorStop(1, 'rgba(255,90,20,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(gx, gy, R, 0, Math.PI * 2); ctx.fill();
+  const gg = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r * 2.2); gg.addColorStop(0, `rgba(255,130,40,${0.28 * k * fl})`); gg.addColorStop(1, 'rgba(255,100,30,0)');
+  ctx.fillStyle = gg; ctx.beginPath(); ctx.ellipse(e.x, e.y, e.r * 2.2, e.r * 1.1, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+// the body of a fire: layered, wavering flame tongues (red outside, orange, a white-yellow core) drawn additively;
+// the particles add the flickering licks and sparks on top of this
+function drawTongues(x, y, W, H, n, tt, seed, k = 1, alpha = 1) {
+  const nz = (a) => Math.sin(a) * 0.6 + Math.sin(a * 2.3 + 1.7) * 0.3 + Math.sin(a * 5.1 + 0.4) * 0.1;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const [wk, hk, c0, c1, c2, al] of [[1, 1, '255,120,30', '225,70,15', '140,30,8', 0.42], [0.66, 0.75, '255,180,70', '255,120,30', '210,60,15', 0.45], [0.34, 0.45, '255,235,160', '255,200,90', '255,150,50', 0.55]]) {
+    for (let i = 0; i < n; i++) {
+      const u = n === 1 ? 0 : i / (n - 1) * 2 - 1, edge = Math.abs(u);
+      const ph = tt * (5.5 + i * 0.9) + seed + i * 2.1;
+      const rnd = (Math.sin(i * 12.9898 + seed * 7.1) * 43758.5453) % 1, base = 0.62 + 0.38 * Math.abs(rnd);
+      const h = H * hk * base * (1 - edge * 0.45) * (0.75 + 0.35 * (nz(ph * 0.7) * 0.5 + 0.5)) * k;
+      const bw = W / n * 1.9 * wk * (1 - edge * 0.3), bx = x + u * W * 0.36;
+      const tipx = bx + nz(ph) * W * 0.22 + u * W * 0.08, midx = bx + nz(ph + 1.3) * W * 0.12;
+      const g = ctx.createLinearGradient(0, y, 0, y - h);
+      const A = al * alpha;
+      g.addColorStop(0, `rgba(${c0},${A})`); g.addColorStop(0.55, `rgba(${c1},${A * 0.85})`); g.addColorStop(1, `rgba(${c2},0)`);
+      ctx.fillStyle = g; ctx.beginPath();
+      // narrow base, a bulge low down, then a long tapering, curling tip
+      ctx.moveTo(bx - bw * 0.35, y);
+      ctx.bezierCurveTo(bx - bw * 0.75, y - h * 0.22, midx - bw * 0.22, y - h * 0.6, tipx, y - h);
+      ctx.bezierCurveTo(midx + bw * 0.12, y - h * 0.55, bx + bw * 0.75, y - h * 0.25, bx + bw * 0.35, y);
+      ctx.quadraticCurveTo(bx, y + bw * 0.25, bx - bw / 2, y);
+      ctx.fill();
     }
   }
-  const g = ctx.createRadialGradient(x, y, 5, x, y, 120); g.addColorStop(0, 'rgba(255,150,60,.18)'); g.addColorStop(1, 'rgba(255,150,60,0)');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 120, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
-  if (Math.random() < 0.25) particles.push({ x: x + rand(-12, 12), y, z: 40, vx: rand(-10, 10), vy: rand(-5, 5), vz: rand(30, 60), life: 1.2, max: 1.2, smoke: true, size: rand(8, 14), grav: -20 });
+}
+// fire is depth-sorted with everything else, so tables, props and characters in front of it hide it
+function drawPitFire() {
+  const [x, y] = MAP.firepit, gust = 0.85 + 0.15 * Math.sin(time * 1.7) * Math.sin(time * 2.9 + 1);
+  drawTongues(x, y - 6, 70, 240 * gust, 5, time, 0);
+}
+function drawEnemyFire(e) {
+  const k = Math.min(1, e.burnT / 0.6), lean = clamp(-(e.fvx || 0) / 400, -0.5, 0.5);
+  ctx.save(); ctx.translate(e.x, e.y - e.z - e.h * 0.12); ctx.transform(1, 0, lean, 1, 0, 0);
+  drawTongues(0, 0, Math.min(110, e.r * 1.3), Math.min(170, e.h * 0.6 + 24), e.d.boss ? 5 : 4, e.t, e.seed || 0, k, 0.7); ctx.restore();
+}
+function drawFirePart(p) {
+  const t = 1 - p.life / p.max, F = fireSpr.flame, n = F.length;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  if (p.ember) {
+    const fl = 0.6 + 0.4 * Math.sin(time * 30 + p.ph), sz = p.size * 3;
+    ctx.globalAlpha = (1 - t) * fl; ctx.drawImage(fireSpr.ember, p.x - sz, p.y - p.z - sz, sz * 2, sz * 2);
+  } else {
+    // cooling: hot yellow at the base, deep red at the tips, fading out
+    const ci = Math.min(n - 1, Math.floor((p.heat + t * 1.05) * n)), sz = p.size * (1 - t * 0.6) * (t < 0.1 ? 0.6 + t * 4 : 1);
+    ctx.globalAlpha = Math.pow(1 - t, 0.8) * 0.3;
+    ctx.drawImage(F[ci], p.x - sz * 0.5, p.y - p.z - sz * 1.2, sz, sz * 2.3); // much taller than wide: a licking tongue
+  }
+  ctx.restore();
+}
+function drawSmokePuff(s) {
+  const t = 1 - s.life / s.max, sz = s.size * (1 + t * 3.2);
+  ctx.save(); ctx.globalAlpha = s.a * Math.min(1, t * 5) * (1 - t);
+  ctx.translate(s.x, s.y - s.z); ctx.rotate(s.rot); ctx.drawImage(fireSpr.smoke, -sz, -sz, sz * 2, sz * 2); ctx.restore();
 }
 
 // ---------- the campaign: 20 hand-made levels, a boss every 5, then an endless feast ----------
@@ -761,8 +910,8 @@ function startWave() {
   waveTimer = banner.t;
   Sfx.wave();
   spawnQueue = buildWave(wave);
-  if (player && CHARS[player.ch].special === 'scrap' && player.macT <= 0) {
-    for (let i = 0; i < 2; i++) { const a = rand(0, Math.PI * 2), d = rand(250, 600); dropPickup(clamp(player.x + Math.cos(a) * d, 80, ARENA.w - 80), clamp(player.y + Math.sin(a) * d, 100, ARENA.h - 80), 'scrap'); }
+  for (const q of players) if (CHARS[q.ch].special === 'scrap' && q.macT <= 0) {
+    for (let i = 0; i < 2; i++) { const a = rand(0, Math.PI * 2), d = rand(250, 600); dropPickup(clamp(q.x + Math.cos(a) * d, 80, ARENA.w - 80), clamp(q.y + Math.sin(a) * d, 100, ARENA.h - 80), 'scrap'); }
   }
 }
 
@@ -770,11 +919,11 @@ function buildWave(n) {
   const q = [], L = levelOf(n);
   if (L.boss) {
     q.push({ type: L.boss, delay: 2.0 });
-    for (let i = 0; i < 4 + Math.floor(n / 2); i++) q.push({ type: pick(L.escorts), delay: 1.3 });
+    for (let i = 0; i < (4 + Math.floor(n / 2)) * (1 + 0.5 * (NP() - 1)); i++) q.push({ type: pick(L.escorts), delay: 1.3 });
     return q;
   }
-  let budget = L.budget;
-  const gap = Math.max(0.22, (L.fast ? 0.8 : 1.1) - n * 0.035);
+  let budget = L.budget * (1 + 0.6 * (NP() - 1)); // more enemies, arriving faster, with more players
+  const gap = Math.max(0.18, ((L.fast ? 0.8 : 1.1) - n * 0.035) / (1 + 0.25 * (NP() - 1)));
   while (budget > 0) {
     const [t, cost] = pick(L.pool);
     if (t === 'cranberry') { for (let i = 0; i < 3; i++) q.push({ type: t, delay: 0.15 }); }
@@ -795,13 +944,13 @@ function spawnEnemy(type, x, y) {
       else if (side === 1) { x = ARENA.w - m; y = rand(120, ARENA.h - 80); fromX = ARENA.w + 90; fromY = y + rand(-30, 30); }
       else if (side === 2) { x = rand(80, ARENA.w - 80); y = ARENA.h - m; fromX = x + rand(-40, 40); fromY = ARENA.h + 90; }
       else { x = m; y = rand(120, ARENA.h - 80); fromX = -90; fromY = y + rand(-30, 30); }
-      if ((x - player.x) ** 2 + (y - player.y) ** 2 > 480 ** 2) break;
+      if (players.every(q => (x - q.x) ** 2 + (y - q.y) ** 2 > 480 ** 2)) break;
     }
     leap = true;
   }
-  const hpScale = 1 + (wave - 1) * 0.09;
+  const hpScale = (1 + (wave - 1) * 0.09) * (1 + 0.45 * (NP() - 1)); // tougher with more players
   const e = {
-    type, d, x, y, vx: 0, vy: 0, r: d.r, h: d.h, hp: d.hp * hpScale, maxHp: d.hp * hpScale,
+    id: nextId++, type, d, x, y, vx: 0, vy: 0, r: d.r, h: d.h, hp: d.hp * hpScale, maxHp: d.hp * hpScale,
     speed: d.speed * (1 + Math.min(wave, 15) * 0.015) * rand(0.9, 1.1), flash: 0, t: rand(0, 3), cd: rand(1, 2.5),
     st: 'move', stT: 0, z: 0, vz: 0, face: 1, kx: 0, ky: 0,
     mass: d.mass || 1, flank: rand(-0.9, 0.9), seed: rand(0, 100),
@@ -809,7 +958,7 @@ function spawnEnemy(type, x, y) {
     spawnT: leap ? 0.75 : 0.25, spawnMax: leap ? 0.75 : 0.25, leap, fromX, fromY, toX: x, toY: y,
   };
   if (leap) { e.x = fromX; e.y = fromY; }
-  if (d.boss) { e.hp = e.maxHp = d.hp * (1 + Math.max(0, wave - d.lvl) / 5 * 0.45); boss = e; e.phase = 0; e.cd = 2; Sfx.gobble(0.5); shake = 20; e.spawnT = e.spawnMax = 1.2; }
+  if (d.boss) { e.hp = e.maxHp = d.hp * (1 + Math.max(0, wave - d.lvl) / 5 * 0.45) * (1 + 0.75 * (NP() - 1)); boss = e; e.phase = 0; e.cd = 2; Sfx.gobble(0.5); shake = 20; e.spawnT = e.spawnMax = 1.2; }
   enemies.push(e);
   return e;
 }
@@ -819,24 +968,36 @@ function update(dt) {
   time += dt;
   if (hitStop > 0) { hitStop -= dt; return; }
   updateWave(dt);
-  updatePlayer(dt);
+  for (const pl of players) { player = pl; pl.input = pl === me ? localInput() : takeRemoteInput(pl); updatePlayer(dt); }
+  player = me;
   updateEnemies(dt);
+  player = me;
   updateBullets(dt);
   updateRoasts(dt);
   updateCans(dt);
   updateFlames(dt);
+  updateFire(dt);
   if (yardSpr) updateYard(dt);
   updateBombs(dt);
   updateMisc(dt);
   // camera
   const look = isTouch && !mouse.active ? 0 : 1;
-  const lookX = Math.cos(player.aim) * 60 * look, lookY = Math.sin(player.aim) * 40 * look;
-  cam.x = lerp(cam.x, player.x + lookX, 1 - Math.exp(-dt * 6));
-  cam.y = lerp(cam.y, player.y - 40 + lookY, 1 - Math.exp(-dt * 6));
+  updateCamera(dt, look);
+  shake = Math.max(0, shake - dt * 40);
+}
+function updateCamera(dt, look = 0) {
+  const lookX = Math.cos(me.aim) * 60 * look, lookY = Math.sin(me.aim) * 40 * look;
+  cam.x = lerp(cam.x, me.x + lookX, 1 - Math.exp(-dt * 6));
+  cam.y = lerp(cam.y, me.y - 40 + lookY, 1 - Math.exp(-dt * 6));
   const hw = VW / ZOOM / 2, hh = VH / ZOOM / 2;
   cam.x = hw * 2 > ARENA.w + 200 ? ARENA.w / 2 : clamp(cam.x, hw - 100, ARENA.w + 100 - hw);
   cam.y = hh * 2 > ARENA.h + 260 ? ARENA.h / 2 : clamp(cam.y, hh - 180, ARENA.h + 80 - hh);
-  shake = Math.max(0, shake - dt * 40);
+}
+// who an enemy goes after: the nearest player still standing
+function targetOf(e) {
+  let best = null, bd = Infinity;
+  for (const q of players) { if (q.dead) continue; const d = (q.x - e.x) ** 2 + (q.y - e.y) ** 2; if (d < bd) { bd = d; best = q; } }
+  return best || me || players[0];
 }
 
 function updateWave(dt) {
@@ -856,12 +1017,16 @@ function updateWave(dt) {
       const bonus = wave * 250; score += bonus;
       banner = wave === LEVELS.length - 1 ? { text: 'THANKSGIVING IS SAVED!', sub: `+${bonus} bonus — the Endless Feast begins...`, t: 4 } : { text: `LEVEL ${wave} CLEARED!`, sub: `+${bonus} bonus`, t: 2.5 };
       if (wave === LEVELS.length - 1) waveTimer = 5;
-      player.victoryT = 2.0;
       Sfx.wave();
-      // reward crate near the player
-      const w = pick(['cran', 'corn', 'pie']);
-      dropPickup(clamp(player.x + rand(-120, 120), 80, ARENA.w - 80), clamp(player.y + rand(-120, 120), 80, ARENA.h - 80), 'weapon', w);
-      if (wave % 2 === 0) dropPickup(clamp(player.x + rand(-150, 150), 80, ARENA.w - 80), clamp(player.y + rand(-150, 150), 80, ARENA.h - 80), 'slice');
+      for (const q of players) {
+        // teammates who went down get back up for the next level
+        if (q.dead) { q.dead = false; q.hp = Math.round(q.maxHp * 0.5); q.inv = 2; q.vz = 0; q.z = 0; floatText(q.x, q.y - 120, `${q.pname} is back!`, '#7dff8a', 1.8, 22); }
+        q.victoryT = 2.0;
+        // a reward crate for each player
+        const w = pick(['cran', 'corn', 'pie']);
+        dropPickup(clamp(q.x + rand(-120, 120), 80, ARENA.w - 80), clamp(q.y + rand(-120, 120), 80, ARENA.h - 80), 'weapon', w);
+        if (wave % 2 === 0) dropPickup(clamp(q.x + rand(-150, 150), 80, ARENA.w - 80), clamp(q.y + rand(-150, 150), 80, ARENA.h - 80), 'slice');
+      }
     }
   } else if (waveState === 'clear') {
     waveTimer -= dt;
@@ -917,8 +1082,33 @@ function aimInput() {
   return { a, fire: (autoFire && !!best) || fireHeld, target: autoAim ? best : null };
 }
 
+// ---------- input: one shape for local devices and remote players ----------
+// mx,my move; a aim angle; fire held; aiming (face the aim even when not shooting); tid auto-aim target id;
+// bx,by bomb target (or null); one-shots: dash, special, bomb, swap (-1/1), weapon (key)
+function blankInput() { return { mx: 0, my: 0, a: Math.PI / 2, fire: false, aiming: false, tid: 0, bx: null, by: null, dash: false, special: false, bomb: false, swap: 0, weapon: null }; }
+function localInput() {
+  let mx = 0, my = 0;
+  if (keys['w'] || keys['arrowup']) my -= 1;
+  if (keys['s'] || keys['arrowdown']) my += 1;
+  if (keys['a'] || keys['arrowleft']) mx -= 1;
+  if (keys['d'] || keys['arrowright']) mx += 1;
+  if (sticks.move) {
+    const dx = sticks.move.x - sticks.move.ox, dy = sticks.move.y - sticks.move.oy, d = Math.hypot(dx, dy);
+    if (d > 8) { const m = Math.min(1, d / 60); mx = dx / d * m; my = dy / d * m; }
+  }
+  const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
+  const ai = aimInput();
+  let bx = null, by = null;
+  if (!isTouch || mouse.active) { const w = screenToWorld(mouse.x, mouse.y); bx = w.x; by = w.y + 20; }
+  const I = { mx, my, a: ai.a, fire: !!ai.fire, aiming: (mouse.active && !isTouch) || (mouse.active && mouse.down), tid: ai.target ? ai.target.id : 0, bx, by,
+    dash: wantDash, special: wantSpecial, bomb: wantBomb, swap: wantSwap, weapon: wantWeapon };
+  wantDash = wantSpecial = wantBomb = false; wantSwap = 0; wantWeapon = null;
+  return I;
+}
+const enemyById = id => id ? enemies.find(e => e.id === id && !e.dead) : null;
+
 function updatePlayer(dt) {
-  const p = player, c = CHARS[p.ch];
+  const p = player, c = CHARS[p.ch], I = p.input || blankInput();
   p.dashCd -= dt; p.inv -= dt; p.fireCd -= dt; p.flash -= dt; p.bombCd -= dt;
   p.hurtT -= dt; p.victoryT -= dt; p.lastFire += dt;
 
@@ -933,24 +1123,16 @@ function updatePlayer(dt) {
     collideProps(p);
     p.x = clamp(p.x, p.r + 10, ARENA.w - p.r - 10); p.y = clamp(p.y, p.r + 30, ARENA.h - p.r - 10);
     springs(p, dt);
-    if (p.deadT <= 0 && state === 'play') gameOver();
+    // the game ends when everyone is down (single player: right away)
+    if (p.deadT <= 0 && state === 'play' && !(NET && !NET.host) && players.every(q => q.dead && q.deadT <= 0)) gameOver();
     return;
   }
 
   // movement input
-  let mx = 0, my = 0;
-  if (keys['w'] || keys['arrowup']) my -= 1;
-  if (keys['s'] || keys['arrowdown']) my += 1;
-  if (keys['a'] || keys['arrowleft']) mx -= 1;
-  if (keys['d'] || keys['arrowright']) mx += 1;
-  if (sticks.move) {
-    const dx = sticks.move.x - sticks.move.ox, dy = sticks.move.y - sticks.move.oy, d = Math.hypot(dx, dy);
-    if (d > 8) { const m = Math.min(1, d / 60); mx = dx / d * m; my = dy / d * m; }
-  }
-  const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
+  const mx = I.mx, my = I.my, ml = Math.hypot(mx, my);
   p.moving = ml > 0.1;
 
-  if (wantDash && p.dashCd <= 0) {
+  if (I.dash && p.dashCd <= 0) {
     const dir = p.moving ? [mx, my] : [Math.cos(p.bodyAng), Math.sin(p.bodyAng)];
     const dl = Math.hypot(dir[0], dir[1]) || 1;
     p.dashDir = [dir[0] / dl, dir[1] / dl]; p.dashT = 0.2; p.dashCd = c.dashCd || 0.9; p.inv = Math.max(p.inv, 0.3);
@@ -958,7 +1140,6 @@ function updatePlayer(dt) {
     Sfx.dash();
     dustBurst(p.x, p.y, 10, 1.4);
   }
-  wantDash = false;
 
   // ----- Eli: Mac & Cheese Blaster timer -----
   if (p.macT > 0) {
@@ -972,26 +1153,26 @@ function updatePlayer(dt) {
   }
 
   // ----- Issac: wind-up -> crazy homing charge -----
-  if (wantSpecial && c.special === 'charge' && p.chargeCd <= 0 && p.chargeT <= 0 && p.chargeWind <= 0) {
+  if (I.special && c.special === 'charge' && p.chargeCd <= 0 && p.chargeT <= 0 && p.chargeWind <= 0) {
     p.chargeWind = 0.55; Sfx.windup();
   }
   // ----- Benny: hurl insults so mean they physically hurt -----
-  if (wantSpecial && c.special === 'taunt' && p.roastCd <= 0 && !p.dead) hurlInsults(p);
+  if (I.special && c.special === 'taunt' && p.roastCd <= 0 && !p.dead) hurlInsults(p);
   // ----- Mama: energy drink cans -----
-  if (wantSpecial && c.special === 'can' && p.canCd <= 0 && !p.dead) hurlCans(p);
+  if (I.special && c.special === 'can' && p.canCd <= 0 && !p.dead) hurlCans(p);
   p.canCd -= dt;
   // ----- Aunty Michelle: acid slime balls -----
-  if (wantSpecial && c.special === 'slime' && p.slimeCd <= 0 && !p.dead) hurlCans(p, 'slime');
+  if (I.special && c.special === 'slime' && p.slimeCd <= 0 && !p.dead) hurlCans(p, 'slime');
   p.slimeCd -= dt;
   // ----- Arthur: chili pepper -> fire breath -----
-  if (wantSpecial && c.special === 'chili' && p.chiliCd <= 0 && p.chewT <= 0 && p.breathT <= 0) { p.chewT = 0.6; p.speech = { text: pick(ARTHUR_SHOUTS), t: 1.4, max: 1.4 }; Sfx.chomp(); }
+  if (I.special && c.special === 'chili' && p.chiliCd <= 0 && p.chewT <= 0 && p.breathT <= 0) { p.chewT = 0.6; p.speech = { text: pick(ARTHUR_SHOUTS), t: 1.4, max: 1.4 }; Sfx.chomp(); }
   p.chiliCd -= dt;
   if (p.chewT > 0) {
     p.chewT -= dt; p.sq = Math.sin(time * 40) * 0.08; p.sqV = 0;
     if (Math.random() < 0.6) particles.push({ x: p.x + rand(-14, 14), y: p.y, z: p.h * 0.9, vx: rand(-40, 40), vy: 0, vz: rand(60, 120), life: 0.5, max: 0.5, smoke: true, size: rand(6, 10), grav: -40 });
     if (p.chewT <= 0) { p.breathT = 5; shake = Math.max(shake, 6); }
   }  // ----- Pops: crouch -> giant jump -> shockwave -----
-  if (wantSpecial && c.special === 'stomp' && p.stompCd <= 0 && p.stompWind <= 0 && p.jumpT <= 0) { p.stompWind = 0.28; p.speech = { text: pick(POPS_SHOUTS), t: 1.3, max: 1.3 }; Sfx.windup(); }
+  if (I.special && c.special === 'stomp' && p.stompCd <= 0 && p.stompWind <= 0 && p.jumpT <= 0) { p.stompWind = 0.28; p.speech = { text: pick(POPS_SHOUTS), t: 1.3, max: 1.3 }; Sfx.windup(); }
   p.stompCd -= dt;
   if (p.stompWind > 0) {
     p.stompWind -= dt; p.vx *= Math.exp(-dt * 10); p.vy *= Math.exp(-dt * 10);
@@ -1003,7 +1184,6 @@ function updatePlayer(dt) {
     if (p.jumpT <= 0 || p.z <= 0) { p.z = 0; p.jumpT = 0; p.vz = 0; stompLand(p); }
   }
   p.roastCd -= dt; p.roastFlash -= dt;
-  wantSpecial = false;
   p.chargeCd -= dt;
   if (p.chargeWind > 0) {
     p.chargeWind -= dt;
@@ -1080,19 +1260,18 @@ function updatePlayer(dt) {
   springs(p, dt);
 
   // aiming / firing
-  const ai = aimInput();
+  const ai = { a: I.a, fire: I.fire, target: enemyById(I.tid), bx: I.bx, by: I.by };
   p.aim = ai.a;
-  if (wantSwap) { cycleWeapon(wantSwap); wantSwap = 0; }
-  if (wantWeapon) { selectWeapon(wantWeapon); wantWeapon = null; }
+  if (I.swap) cycleWeapon(I.swap);
+  if (I.weapon) selectWeapon(I.weapon);
   const busyMouth = p.breathT > 0 || p.chewT > 0;
   if (p.breathT > 0) breatheFire(p, dt);
   if (ai.fire && p.fireCd <= 0 && !charging && !busyMouth) { fire(ai); p.lastFire = 0; }
-  if (wantBomb && p.bombs > 0 && p.bombCd <= 0 && !charging) { throwBomb(ai); p.lastFire = 0; }
-  wantBomb = false;
+  if (I.bomb && p.bombs > 0 && p.bombCd <= 0 && !charging) { throwBomb(ai); p.lastFire = 0; }
 
   // which way the BODY faces: the aim while shooting (or when a mouse is aiming), otherwise travel direction
   const spd = Math.hypot(p.vx, p.vy);
-  const aiming = p.lastFire < 0.7 || (mouse.active && !isTouch) || (mouse.active && mouse.down);
+  const aiming = p.lastFire < 0.7 || I.aiming;
   const want = aiming ? p.aim : spd > 40 ? Math.atan2(p.vy, p.vx) : p.bodyAng;
   p.bodyAng = angLerp(p.bodyAng, want, 1 - Math.exp(-dt * (aiming ? 22 : 12)));
   // the gun is raised toward the target when shooting, carried pointing along the body otherwise
@@ -1147,11 +1326,11 @@ function fire() {
     const sp = w.speed * (w.count > 1 ? rand(0.85, 1.1) : 1);
     let dmg = w.dmg;
     if (p.cur === 'gravy') dmg *= (c.gravyMul || 1);
-    bullets.push({ w: p.cur, x: tip.x, y: tip.y, z: tip.z, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: w.r, dmg, life: w.life * (w.count > 1 ? rand(0.8, 1.15) : 1), max: w.life, hits: new Set(), rot: 0 });
+    bullets.push({ id: nextId++, owner: p, w: p.cur, x: tip.x, y: tip.y, z: tip.z, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: w.r, dmg, life: w.life * (w.count > 1 ? rand(0.8, 1.15) : 1), max: w.life, hits: new Set(), rot: 0 });
   }
   if (!w.special && p.ammo[p.cur] !== Infinity) {
     p.ammo[p.cur]--;
-    if (p.ammo[p.cur] <= 0) { p.ammo[p.cur] = 0; floatText(p.x, p.y - 110, 'Out of ammo!', '#fff'); setTimeout(() => { if (player && player.ammo[player.cur] <= 0) player.cur = 'gravy'; }, 150); }
+    if (p.ammo[p.cur] <= 0) { p.ammo[p.cur] = 0; floatText(p.x, p.y - 110, 'Out of ammo!', '#fff'); setTimeout(() => { if (p.ammo[p.cur] <= 0) p.cur = 'gravy'; }, 150); }
   }
   // recoil + muzzle puff
   p.vx -= Math.cos(p.aim) * (p.cur === 'cran' ? 160 : 15); p.vy -= Math.sin(p.aim) * (p.cur === 'cran' ? 160 : 15);
@@ -1164,7 +1343,7 @@ function throwBomb(ai) {
   const p = player, c = CHARS[p.ch];
   p.bombs--; p.bombCd = 0.35;
   let tx, ty;
-  if (!isTouch || mouse.active) { const w = screenToWorld(mouse.x, mouse.y); tx = w.x; ty = w.y + 20; }
+  if (ai.bx != null) { tx = ai.bx; ty = ai.by; }
   else if (ai.target) { tx = ai.target.x; ty = ai.target.y; }
   else { tx = p.x + Math.cos(p.aim) * 320; ty = p.y + Math.sin(p.aim) * 320; }
   const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), maxD = 480;
@@ -1196,8 +1375,9 @@ function hitProp(b) {
 }
 
 function updateEnemies(dt) {
-  const p = player;
+  let p = player;
   for (const e of enemies) {
+    p = player = targetOf(e);
     e.t += dt; e.flash -= dt; e.cd -= dt; e.stT -= dt; e.hurtT -= dt;
     const d = e.d, ai = d.ai;
 
@@ -1374,8 +1554,7 @@ function updateEnemies(dt) {
         if (o === e || o.dead || o.spawnT > 0 || o.burnT > 0) continue;
         if ((o.x - e.x) ** 2 + (o.y - e.y) ** 2 < (o.r + e.r + 6) ** 2 && Math.random() < dt * 3) igniteEnemy(o, o.d.boss ? 1 : 2.2);
       }
-      if (Math.random() < dt * 22) particles.push({ x: e.x + rand(-e.r, e.r) * 0.6, y: e.y, z: e.h * rand(0.4, 1), vx: rand(-20, 20), vy: rand(-10, 10), vz: rand(80, 160), life: 0.45, max: 0.45, color: pick(['#ffb03a', '#ff6a1a', '#ffe14d']), size: rand(3, 7), grav: -120 });
-      if (Math.random() < dt * 6) particles.push({ x: e.x + rand(-10, 10), y: e.y - 2, z: e.h * 0.9, vx: rand(-15, 15), vy: rand(-8, 8), vz: rand(40, 80), life: 0.9, max: 0.9, smoke: true, size: rand(10, 18), grav: -30 });
+      // (flames, embers and smoke for burning bodies come from updateFire)
     }
     // Pops' shockwave: flat on their back, flailing, trying (and failing) to get up
     if (e.downT > 0) {
@@ -1449,9 +1628,11 @@ function updateEnemies(dt) {
     springs(e, dt);
     e.face = dx > 0 ? 1 : -1;
 
-    // contact damage
-    if (dist < e.r + p.r && e.z < 30 && p.inv <= 0 && !p.dead && !(e.sulkT > 0) && !(e.hypeT > 0) && !(e.downT > 0) && !(e.meltT > 0)) {
-      hurtPlayer(d.dmg * (e.st === 'dash' || e.st === 'lunge' || e.st === 'roll' ? 1.4 : 1), nx, ny);
+    // contact damage (anyone touching it, not just its target)
+    if (e.z < 30 && !(e.sulkT > 0) && !(e.hypeT > 0) && !(e.downT > 0) && !(e.meltT > 0)) for (const q of players) {
+      if (q.inv > 0 || q.dead) continue;
+      const qd = Math.hypot(q.x - e.x, q.y - e.y);
+      if (qd < e.r + q.r) hurtPlayer(d.dmg * (e.st === 'dash' || e.st === 'lunge' || e.st === 'roll' ? 1.4 : 1), (q.x - e.x) / (qd || 1), (q.y - e.y) / (qd || 1), q);
     }
   }
 }
@@ -1559,20 +1740,20 @@ function updateBoss(e, dt, nx, ny, d) {
   }
 }
 
-function hurtPlayer(dmg, nx, ny) {
-  const p = player;
+function hurtPlayer(dmg, nx, ny, p = player) {
   if (p.dead) return;
   if (testLevel && testGod) { p.flash = 0.1; return; }
   p.hp -= dmg; p.inv = 0.9; p.flash = 0.15; p.hurtT = 0.28;
   p.vx += nx * 520; p.vy += ny * 520;
   p.sq = 0.18; p.sqV = 0; p.leanV += (nx >= 0 ? 1 : -1) * 6;
-  shake = Math.max(shake, 10); hitStop = 0.05;
+  if (p === me) { shake = Math.max(shake, 10); hitStop = 0.05; } else netFx(p, 'hurt');
   floatText(p.x, p.y - p.h - 10, `-${Math.round(dmg)}`, '#ff6b6b');
-  Sfx.hurt();
+  if (p === me) Sfx.hurt();
   if (p.hp <= 0) {
     p.hp = 0; p.dead = true; p.deadT = 1.6; p.inv = 99;
-    p.vx = nx * 600; p.vy = ny * 600; p.vz = 420; hitStop = 0.18; shake = 18;
-    Sfx.over();
+    p.vx = nx * 600; p.vy = ny * 600; p.vz = 420;
+    if (p === me) { hitStop = 0.18; shake = 18; Sfx.over(); } else netFx(p, 'down');
+    if (NET && players.some(q => !q.dead)) floatText(p.x, p.y - p.h - 40, `${p.pname} is down!`, '#ff6b6b', 2.2, 22);
   }
 }
 
@@ -1590,6 +1771,17 @@ function damageEnemy(e, dmg, kx, ky, kb = 120) {
   if (e.hp <= 0) killEnemy(e);
 }
 
+function deathBurst(x, y, h, type, colors) {
+  const boss = ENEMIES[type] && ENEMIES[type].boss, n = boss ? 120 : 14;
+  colors = colors || DEATH_COLORS[type] || ['#c8752d', '#e8b05a'];
+  for (let i = 0; i < n; i++) {
+    const feather = (type === 'turkey' || boss) && i % 3 === 0;
+    particles.push({ x, y, z: h * 0.4, vx: rand(-220, 220), vy: rand(-160, 160), vz: rand(100, 420), life: rand(0.6, 1.4), max: 1.4, color: pick(colors), size: rand(4, 10) * (boss ? 1.8 : 1), grav: feather ? 120 : 900, feather, rot: rand(0, 6) });
+  }
+}
+const DEATH_COLORS = { turkey: ['#7a4a22', '#c8752d', '#e8b05a', '#c0392b'], potato: ['#c9a463', '#f2d16b', '#8a6a3a'], tot: ['#c9a463', '#f2d16b'],
+  cranberry: ['#b0102a', '#ff5a6e', '#6e0a1a'], corn: ['#f4c430', '#fff2a0', '#4a8a2a'], pumpkin: ['#e8742a', '#ffb347', '#3d6b22'], boss: ['#7a4a22', '#c8752d', '#e8b05a', '#c0392b', '#222'],
+  mashboss: ['#c9a463', '#f2d16b', '#8a5a2a', '#fff2c0'], gourdboss: ['#e8742a', '#ffb347', '#3d6b22', '#ffd36a'], cornboss: ['#f4c430', '#fff2a0', '#4a8a2a', '#ffe14d'] };
 function killEnemy(e) {
   if (e.dead) return;
   e.dead = true;
@@ -1599,22 +1791,19 @@ function killEnemy(e) {
   const colors = { turkey: ['#7a4a22', '#c8752d', '#e8b05a', '#c0392b'], potato: ['#c9a463', '#f2d16b', '#8a6a3a'], tot: ['#c9a463', '#f2d16b'],
     cranberry: ['#b0102a', '#ff5a6e', '#6e0a1a'], corn: ['#f4c430', '#fff2a0', '#4a8a2a'], pumpkin: ['#e8742a', '#ffb347', '#3d6b22'], boss: ['#7a4a22', '#c8752d', '#e8b05a', '#c0392b', '#222'],
     mashboss: ['#c9a463', '#f2d16b', '#8a5a2a', '#fff2c0'], gourdboss: ['#e8742a', '#ffb347', '#3d6b22', '#ffd36a'], cornboss: ['#f4c430', '#fff2a0', '#4a8a2a', '#ffe14d'] }[e.type] || ['#c8752d', '#e8b05a'];
-  const n = e.d.boss ? 120 : 14;
-  for (let i = 0; i < n; i++) {
-    const feather = (e.type === 'turkey' || e.d.boss) && i % 3 === 0;
-    particles.push({ x: e.x, y: e.y, z: e.h * 0.4, vx: rand(-220, 220), vy: rand(-160, 160), vz: rand(100, 420), life: rand(0.6, 1.4), max: 1.4, color: pick(colors), size: rand(4, 10) * (e.d.boss ? 1.8 : 1), grav: feather ? 120 : 900, feather, rot: rand(0, 6) });
-  }
+  deathBurst(e.x, e.y, e.h, e.type, colors);
+  netEvent('k', [Math.round(e.x), Math.round(e.y), e.h, e.type]);
   // the body: flung along the killing blow, tumbles, bounces, settles, then fades into the lawn
-  const [hx, hy, kb] = e.lastHit || [Math.sign(e.x - player.x) || 1, 0, 120];
+  const [hx, hy, kb] = e.lastHit || [Math.sign(e.x - me.x) || 1, 0, 120];
   const fling = clamp(kb * 2.2, 160, 900) / Math.sqrt(e.mass);
   corpses.push({
-    name: e.d.img, row: AN[e.d.img] && AN[e.d.img].rows.act !== undefined ? 'act' : 'hop', frame: 3, h: e.h, x: e.x, y: e.y, z: e.z,
+    _net: true, name: e.d.img, row: AN[e.d.img] && AN[e.d.img].rows.act !== undefined ? 'act' : 'hop', frame: 3, h: e.h, x: e.x, y: e.y, z: e.z,
     vx: e.vx * 0.4 + hx * fling, vy: e.vy * 0.4 + hy * fling * 0.7, vz: clamp(kb, 150, 600) / Math.sqrt(e.mass),
     rot: 0, vrot: (hx >= 0 ? 1 : -1) * rand(6, 12) / e.mass, flip: hx < 0, life: e.d.boss ? 4 : 2.4, max: e.d.boss ? 4 : 2.4, mass: e.mass, r: e.r,
   });
   if (e.d.boss) {
     boss = null; shake = 30; hitStop = 0.25; Sfx.boom();
-    for (let i = 0; i < 6; i++) dropPickup(e.x + rand(-120, 120), e.y + rand(-80, 80), i < 2 ? 'slice' : i < 4 ? 'weapon' : 'bomb', pick(['cran', 'corn', 'pie']));
+    for (let i = 0; i < 6 + 3 * (NP() - 1); i++) dropPickup(e.x + rand(-120, 120), e.y + rand(-80, 80), i % 3 === 0 ? 'slice' : i % 3 === 1 ? 'weapon' : 'bomb', pick(['cran', 'corn', 'pie']));
     floatText(e.x, e.y - 200, e.d.bname + ' DEFEATED!', '#ffc53d', 2.5, 34);
   }
   if (e.d.split) {
@@ -1623,23 +1812,22 @@ function killEnemy(e) {
       t.spawnT = 0; const a = rand(0, Math.PI * 2); t.vx = Math.cos(a) * 260; t.vy = Math.sin(a) * 180; t.vz = 320; t.z = 10; t.hurtT = 0.4;
     }
   }
-  const r = Math.random();
+  const r = Math.random() / (1 + 0.25 * (NP() - 1)); // more goodies with more players
   if (!e.d.boss) {
     if (r < 0.06) dropPickup(e.x, e.y, 'slice');
     else if (r < 0.13) dropPickup(e.x, e.y, 'weapon', pick(['cran', 'corn', 'pie']));
     else if (r < 0.17) dropPickup(e.x, e.y, 'bomb');
   }
   if (e.type === 'pumpkin' && Math.random() < 0.5) dropPickup(e.x, e.y, 'weapon', pick(['cran', 'corn', 'pie']));
-  const pc = CHARS[player.ch];
-  if (pc.special === 'scrap' && player.macT <= 0) {
+  if (players.some(q => CHARS[q.ch].special === 'scrap' && q.macT <= 0)) {
     if (e.d.boss) for (let i = 0; i < 3; i++) dropPickup(e.x + rand(-80, 80), e.y + rand(-60, 60), 'scrap');
     else if (Math.random() < 0.38) dropPickup(e.x + rand(-10, 10), e.y + rand(-10, 10), 'scrap');
   }
-  if (pc.special === 'taunt' && !player.dead && (e.d.boss || (time - player.lastTaunt > 1.0 && Math.random() < 0.8))) {
+  for (const q of players) if (CHARS[q.ch].special === 'taunt' && !q.dead && (e.d.boss || (time - q.lastTaunt > 1.0 && Math.random() < 0.8))) {
     const pool = TAUNTS[e.type] && Math.random() < 0.55 ? TAUNTS[e.type] : TAUNTS.any;
     let line = pick(pool);
-    if (player.speech && player.speech.text === line) line = pick(TAUNTS.any);
-    player.speech = { text: line, t: 1.9, max: 1.9 }; player.lastTaunt = time;
+    if (q.speech && q.speech.text === line) line = pick(TAUNTS.any);
+    q.speech = { text: line, t: 1.9, max: 1.9 }; q.lastTaunt = time;
     Sfx.taunt();
   }
 }
@@ -1940,8 +2128,8 @@ function dropPickup(x, y, kind, weapon) {
 }
 
 function updateBullets(dt) {
-  const p = player;
   for (const b of bullets) {
+    const p = b.owner || me;
     b.life -= dt; b.rot += dt * 18;
     if (b.w === 'pie' && b.life < b.max * 0.55) {
       // boomerang back to player
@@ -1973,8 +2161,8 @@ function updateBullets(dt) {
   for (const b of ebullets) {
     b.life -= dt; b.x += b.vx * dt; b.y += b.vy * dt;
     if (hitProp(b)) { b.life = 0; continue; }
-    if (p.inv <= 0 && (p.x - b.x) ** 2 + (p.y - b.y) ** 2 < (p.r + b.r) ** 2) {
-      b.life = 0; const sp = Math.hypot(b.vx, b.vy) || 1; hurtPlayer(b.dmg, b.vx / sp * 0.4, b.vy / sp * 0.4);
+    for (const q of players) if (!q.dead && q.inv <= 0 && (q.x - b.x) ** 2 + (q.y - b.y) ** 2 < (q.r + b.r) ** 2) {
+      b.life = 0; const sp = Math.hypot(b.vx, b.vy) || 1; hurtPlayer(b.dmg, b.vx / sp * 0.4, b.vy / sp * 0.4, q); break;
     }
   }
   ebullets = ebullets.filter(b => b.life > 0 && b.x > -50 && b.x < ARENA.w + 50 && b.y > -50 && b.y < ARENA.h + 50);
@@ -1991,7 +2179,7 @@ function impact(b) {
     Sfx.splat();
   }
   if (b.w === 'gravy') {
-    const c = CHARS[player.ch];
+    const c = CHARS[(b.owner || me).ch];
     if (Math.random() < 0.22 * (c.puddleMul || 1)) puddles.push({ x: b.x, y: b.y, r: rand(34, 52), life: 5, max: 5, seed: Math.random() * 10 });
   }
 }
@@ -2048,11 +2236,10 @@ function explode(x, y, radius, dmg) {
 }
 
 function updateMisc(dt) {
-  const p = player, c = CHARS[p.ch];
-  // the feast tables restock a health pack every so often
+  // the feast tables restock a health pack every so often (faster with more players)
   tableT -= dt;
   if (tableT <= 0 && state === 'play') {
-    tableT = 15;
+    tableT = 15 / Math.sqrt(NP());
     const free = props.filter(pr => pr.table && !pickups.some(it => it.table === pr));
     if (free.length) {
       const t = pick(free);
@@ -2074,14 +2261,17 @@ function updateMisc(dt) {
   puddles = puddles.filter(pu => pu.life > 0);
   if (puddles.length > 40) puddles.shift();
   for (const f of floaters) { f.life -= dt; f.y -= dt * 40; }
-  if (p.speech) { p.speech.t -= dt; if (p.speech.t <= 0) p.speech = null; }
+  for (const q of players) if (q.speech) { q.speech.t -= dt; if (q.speech.t <= 0) q.speech = null; }
   for (const w of webs) w.life -= dt;
   webs = webs.filter(w => w.life > 0);
   floaters = floaters.filter(f => f.life > 0);
   for (const it of pickups) {
     it.life -= dt; it.t += dt;
     if (!it.perch) { it.vz -= 900 * dt; it.z = Math.max(0, it.z + it.vz * dt); if (it.z === 0) it.vz = Math.abs(it.vz) > 60 ? -it.vz * 0.4 : 0; }
-    const d2 = dist2(it, p);
+    let p = null, d2 = Infinity;
+    for (const q of players) { if (q.dead || (it.kind === 'scrap' && CHARS[q.ch].special !== 'scrap')) continue; const dd = dist2(it, q); if (dd < d2) { d2 = dd; p = q; } }
+    if (!p) continue;
+    const c = CHARS[p.ch];
     if (d2 < 130 ** 2) { if (it.perch) { it.perch = false; it.vz = 60; } const d = Math.sqrt(d2) || 1; it.x += (p.x - it.x) / d * 380 * dt; it.y += (p.y - it.y) / d * 380 * dt; }
     if (d2 < 34 ** 2) {
       it.life = 0;
@@ -2093,7 +2283,7 @@ function updateMisc(dt) {
         else {
           p.scraps++;
           Sfx.clank();
-          if (p.scraps >= 5) assembleMac();
+          if (p.scraps >= 5) { player = p; assembleMac(); player = me; }
           else floatText(p.x, p.y - 110, `Scrap ${p.scraps}/5`, '#cfd8dc', 0.9, 17);
         }
       }
@@ -2111,7 +2301,10 @@ function updateMisc(dt) {
   updateCorpses(dt);
 }
 
-function floatText(x, y, text, color, life = 0.9, size = 18) { floaters.push({ x, y, text: String(text), color, life, max: life, size }); }
+function floatText(x, y, text, color, life = 0.9, size = 18) {
+  floaters.push({ x, y, text: String(text), color, life, max: life, size });
+  netEvent('f', [Math.round(x), Math.round(y), String(text), color, life, size]);
+}
 
 
 // ---------- animation & body-dynamics helpers ----------
@@ -2507,7 +2700,9 @@ function render() {
   for (const e of enemies) shadow(e.x, e.y, e.r * (1 - Math.min(e.z, 200) / 330), 0.28 * (1 - Math.min(e.z, 200) / 400));
   for (const e of enemies) if (e.stuckT > 0) drawStuckPuddle(e);
   for (const e of enemies) if (e.d.aura) { const g = ctx.createRadialGradient(e.x, e.y, 10, e.x, e.y, e.r * 1.8); const a = 0.25 + Math.sin(time * 4) * 0.08; g.addColorStop(0, e.d.aura + a + ')'); g.addColorStop(1, e.d.aura + '0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(e.x, e.y, e.r * 1.8, e.r * 1.0, 0, 0, Math.PI * 2); ctx.fill(); }
-  shadow(player.x, player.y, player.r * (player.dead && player.z <= 0 ? 1.9 : 1.1) * (1 - Math.min(player.z, 200) / 400));
+  for (const q of players) shadow(q.x, q.y, q.r * (q.dead && q.z <= 0 ? 1.9 : 1.1) * (1 - Math.min(q.z, 200) / 400));
+  // in multiplayer, a coloured ring under each player so you can tell who's who (yours is gold)
+  if (NET) for (const q of players) { ctx.strokeStyle = q === me ? 'rgba(255,215,80,.8)' : 'rgba(120,200,255,.6)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r * 1.5, q.r * 0.6, 0, 0, Math.PI * 2); ctx.stroke(); }
   for (const c of corpses) shadow(c.x, c.y, c.r * 1.3 * (1 - Math.min(c.z, 200) / 400), 0.22 * Math.min(1, c.life / 0.7));
   for (const it of pickups) shadow(it.x, it.y, 14);
   for (const b of bombs) shadow(b.x, b.y, 14 * (1 - Math.min(b.z, 300) / 500), 0.25);
@@ -2519,12 +2714,17 @@ function render() {
   for (const pr of props) if (!pr.flat) list.push([pr.y, () => pr.rock ? drawRock(pr) : drawSprite(pr.img, pr.x, pr.y + pr.d * 0.45, pr.h, false)]);
   for (const c of corpses) list.push([c.y - 2, () => drawCorpse(c)]);
   for (const e of enemies) list.push([e.y, () => drawEnemy(e)]);
-  list.push([player.y, drawPlayer]);
+  for (const q of players) list.push([q.y, () => { player = q; drawPlayer(); if (NET) drawNameTag(q); player = me; }]);
   for (const it of pickups) list.push([it.y, () => drawPickup(it)]);
   for (const b of bullets) list.push([b.y, () => drawBullet(b)]);
   for (const r of roasts) list.push([r.y, () => drawRoast(r)]);
   for (const c of cans) list.push([c.y, () => drawCan(c)]);
   for (const f of flames) list.push([f.y, () => drawFlame(f)]);
+  if (fireSpr) {
+    list.push([MAP.firepit[1] - 6, drawPitFire]);
+    for (const p of fireParts) list.push([p.y, () => drawFirePart(p)]);
+    for (const sm of smokeParts) list.push([sm.y, () => drawSmokePuff(sm)]);
+  }
   if (yardSpr) {
     for (const l of leaves) if (!l.rest) list.push([l.y, () => drawLeaf(l)]);
     for (const g of gourds) if (!g.dead) list.push([g.y, () => drawGourd(g)]);
@@ -2537,10 +2737,10 @@ function render() {
   list.sort((a, b) => a[0] - b[0]);
   for (const [, fn] of list) fn();
 
-  // smoke & rings above
+  // smoke & rings above, then all the live fire on top
   for (const pt of particles) if (pt.smoke || pt.ring) drawParticle(pt);
 
-  drawSpeech(player);
+  for (const q of players) drawSpeech(q);
   // floaters
   ctx.textAlign = 'center'; ctx.lineJoin = 'round';
   for (const f of floaters) {
@@ -2610,7 +2810,7 @@ function drawEnemyBody(e) {
   if (e.downT > 0) drawDizzy(e);
   if (e.hypeT > 0) drawZaps(e);
   if (e.meltT > 0) drawMelt(e);
-  if (e.burnT > 0) drawBurning(e);
+  if (e.burnT > 0) { drawBurning(e); if (fireSpr) drawEnemyFire(e); }
   if (e.hp < e.maxHp && !e.d.boss) {
     const w = Math.max(30, e.r * 2), y = e.y - e.h - 12 - e.z;
     ctx.fillStyle = '#2b1a10'; ctx.fillRect(e.x - w / 2 - 1, y - 1, w + 2, 7);
@@ -2622,6 +2822,14 @@ function drawEnemyBody(e) {
   }
 }
 
+// the player's own name over their head (multiplayer), so you know who's playing which character
+function drawNameTag(q) {
+  const y = q.y - q.z - q.h - 20;
+  ctx.font = `15px 'Lilita One', sans-serif`; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+  ctx.lineWidth = 4; ctx.strokeStyle = '#2b1a10'; ctx.strokeText(q.pname, q.x, y);
+  ctx.fillStyle = q === me ? '#ffd84a' : '#bfe6ff'; ctx.fillText(q.pname, q.x, y);
+  if (q !== me && !q.dead) { const w = 40; ctx.fillStyle = '#2b1a10'; ctx.fillRect(q.x - w / 2 - 1, y + 5, w + 2, 6); ctx.fillStyle = '#5fd06a'; ctx.fillRect(q.x - w / 2, y + 6, w * Math.max(0, q.hp / q.maxHp), 4); }
+}
 function drawPlayer() {
   const p = player, wade = !p.dead && p.z <= 1 && inPond(p.x, p.y);
   if (!wade) { drawPlayerBody(); return; }
@@ -2825,7 +3033,7 @@ function drawHUD() {
   ctx.strokeStyle = '#2b1a10'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.stroke();
   // name + hp bar
   const bx = px + pr + 10, bw = Math.min(220, VW * 0.35);
-  hudText(names[p.ch], bx, top + 20, 18);
+  hudText(NET ? `${p.pname} · ${names[p.ch]}` : names[p.ch], bx, top + 20, 18);
   ctx.fillStyle = '#2b1a10'; ctx.beginPath(); ctx.roundRect(bx - 2, top + 28, bw + 4, 18, 9); ctx.fill();
   const f = p.hp / p.maxHp;
   ctx.fillStyle = f > 0.5 ? '#6fd36f' : f > 0.25 ? '#ffc53d' : '#ff5a4a';
@@ -2835,6 +3043,17 @@ function drawHUD() {
   // score / wave (top right, below buttons)
   hudText(`${score.toLocaleString()}`, VW - 14, top + 76, 26, '#ffc53d', 'right');
   hudText(`LEVEL ${wave}`, VW - 14, top + 98, 16, '#fff4dc', 'right');
+  // teammates: name, character and health (top right)
+  if (NET) {
+    let ty = top + 122;
+    for (const q of players) {
+      if (q === me) continue;
+      hudText(`${q.pname} · ${names[q.ch]}`, VW - 14, ty, 13, q.dead ? '#ff8a7a' : '#bfe6ff', 'right');
+      const w = 110; ctx.fillStyle = '#2b1a10'; ctx.fillRect(VW - 14 - w - 1, ty + 4, w + 2, 7);
+      ctx.fillStyle = q.dead ? '#7a3a30' : '#5fd06a'; ctx.fillRect(VW - 14 - w, ty + 5, w * Math.max(0, q.hp / q.maxHp), 5);
+      ty += 28;
+    }
+  }
 
   // weapons bar (bottom center)
   // phones: compact row at the top-left (keeps the bottom-left free for the move stick)
@@ -2959,6 +3178,7 @@ function show(id) {
 }
 
 function buildCards() {
+  $('pnameSel').value = playerName();
   const wrap = $('cards'); wrap.innerHTML = '';
   for (const k of CHAR_ORDER) {
     const c = CHARS[k];
@@ -2976,6 +3196,7 @@ function buildCards() {
 }
 
 function startGame() {
+  const nm = $('pnameSel').value.trim(); if (nm) setPlayerName(nm);
   Sfx.unlock();
   document.activeElement && document.activeElement.blur && document.activeElement.blur();
   sticks.move = sticks.aim = null;
@@ -2985,24 +3206,58 @@ function startGame() {
 }
 
 function togglePause() {
-  if (state === 'play') { state = 'paused'; show('pause'); }
+  // in multiplayer the game keeps running for everyone; this is just a menu
+  if (state === 'play') { state = 'paused'; show('pause'); $('pauseTitle').textContent = NET ? 'Menu' : 'Paused'; $('quitBtn').textContent = NET ? 'Leave Game' : 'Quit'; }
   else if (state === 'paused') { state = 'play'; show(null); last = performance.now(); }
 }
 
 function toggleMute() { const m = Sfx.toggle(); $('muteBtn').textContent = m ? '🔇' : '🔊'; }
 
 function gameOver() {
+  if (state === 'over') return;
   state = 'over';
-  const hi = store.get('tg_hi', 0);
-  const isHi = score > hi; if (isHi) store.set('tg_hi', score);
+  if (NET && NET.host) { NET.room.send({ k: 'over', score, kills, wave }); TGNet.setStatus(NET.room.code, 'lobby'); }
+  submitScore();
+  const hiKey = NET ? 'tg_hi_multi' : 'tg_hi';
+  const hi = store.get(hiKey, 0);
+  const isHi = score > hi; if (isHi) store.set(hiKey, score);
   $('overTitle').textContent = pick(['STUFFED!', 'GOBBLED UP!', 'YOU GOT BASTED!', 'TOAST!']);
   $('overStats').innerHTML = '';
-  const lines = [`${names[player.ch]} made it to level ${wave}`, `Score: ${score.toLocaleString()}${isHi ? '  🏆 NEW BEST!' : ''}`, `Foes defeated: ${kills}`, `Best: ${Math.max(hi, score).toLocaleString()}`];
+  const who = NET ? players.map(q => q.pname).join(', ') : `${playerName() || names[me.ch]} (${names[me.ch]})`;
+  const lines = [`${who} made it to level ${wave}`, `Score: ${score.toLocaleString()}${isHi ? '  🏆 NEW BEST!' : ''}`, `Foes defeated: ${kills}`, `Best: ${Math.max(hi, score).toLocaleString()}`];
+  // multiplayer: the host can run it back with the same crew; everyone else waits or leaves
+  $('againBtn').style.display = !NET || NET.host ? '' : 'none';
+  $('againBtn').textContent = NET ? 'Back to Lobby' : 'Play Again';
+  $('charBtn').style.display = NET ? 'none' : '';
+  $('overQuitBtn').textContent = NET ? 'Leave' : 'Quit';
   for (const l of lines) { const d = document.createElement('div'); d.textContent = l; $('overStats').appendChild(d); }
   setTimeout(() => show('over'), 250);
 }
 
 $('playBtn').addEventListener('click', () => { Sfx.unlock(); testLevel = 0; state = 'select'; buildCards(); show('select'); });
+$('multiBtn').addEventListener('click', () => { Sfx.unlock(); openMulti(); });
+$('scoresBtn').addEventListener('click', () => showScores('single'));
+for (const b of document.querySelectorAll('#scoreTabs button')) b.addEventListener('click', () => showScores(b.dataset.mode));
+$('scoresBack').addEventListener('click', () => show('title'));
+$('hostBtn').addEventListener('click', hostGame);
+$('joinBtn').addEventListener('click', joinGame);
+$('joinCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4); });
+$('joinCode').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') joinGame(); });
+$('pnameMulti').addEventListener('keydown', e => e.stopPropagation());
+$('pnameSel').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); });
+$('multiBack').addEventListener('click', () => show('title'));
+$('lobbyStart').addEventListener('click', hostStart);
+$('lobbyLeave').addEventListener('click', quitToTitle);
+$('lobbyShare').addEventListener('click', async () => {
+  const url = `${location.origin}${location.pathname}?join=${NET.room.code}${new URLSearchParams(location.search).get('net') === 'local' ? '&net=local' : ''}`;
+  try { if (navigator.share) await navigator.share({ title: 'Turkey Day Takedown', text: `Join my game! Code ${NET.room.code}`, url }); else { await navigator.clipboard.writeText(url); $('lobbyShare').textContent = 'Link copied!'; setTimeout(() => ($('lobbyShare').textContent = 'Share invite'), 1500); } } catch {}
+});
+function openMulti(code) {
+  $('pnameMulti').value = playerName();
+  if (code) $('joinCode').value = code;
+  $('multiMsg').textContent = window.TGNet && TGNet.available ? '' : 'Multiplayer needs the online version of the game.';
+  show('multi');
+}
 // ---------- test mode: jump straight to any level (optionally invincible) ----------
 let testLevel = 0, testGod = store.get('tg_god', false);
 function buildLevels() {
@@ -3024,10 +3279,13 @@ $('aimBtn').addEventListener('click', e => { e.currentTarget.blur(); setAuto(!au
 $('fireBtn').addEventListener('click', e => { e.currentTarget.blur(); setAuto(autoAim, !autoFire); });
 setAuto(autoAim, autoFire);
 $('goBtn').addEventListener('click', startGame);
-$('againBtn').addEventListener('click', startGame);
+$('againBtn').addEventListener('click', () => {
+  if (NET && NET.host) { state = 'lobby'; for (const r of NET.roster) r.ch = r.ch; show('lobby'); lobbyBroadcast(); return; }
+  startGame();
+});
 $('charBtn').addEventListener('click', () => { state = 'select'; buildCards(); show('select'); });
 $('resumeBtn').addEventListener('click', togglePause);
-function quitToTitle() { state = 'title'; player = null; testLevel = 0; show('title'); refreshTitle(); }
+function quitToTitle() { leaveNet(); state = 'title'; player = null; players = []; testLevel = 0; show('title'); refreshTitle(); }
 $('quitBtn').addEventListener('click', quitToTitle);
 $('overQuitBtn').addEventListener('click', quitToTitle);
 $('muteBtn').addEventListener('click', toggleMute);
@@ -3044,20 +3302,405 @@ $('ctrlHint').textContent = isTouch
 $('title').style.backgroundImage = "url('assets/title.jpg')";
 refreshTitle();
 
+// ======================================================================================
+// ---------- multiplayer ----------
+// The host's device runs the real game (everything above). Other players send it their input
+// and draw what its snapshots say, predicting their own movement so controls feel instant.
+// Transport (direct WebRTC with an AWS relay fallback) lives in src/net.js as window.TGNet.
+// ======================================================================================
+const MAX_PLAYERS = CHAR_ORDER.length;
+const r2 = v => typeof v === 'number' ? (v === Infinity ? 1e9 : Math.round(v * 100) / 100) : v;
+const unInf = v => v === 1e9 ? Infinity : v;
+const K = {
+  pl: ['id', 'ch', 'pname', 'x', 'y', 'z', 'vx', 'vy', 'hp', 'maxHp', 'dir', 'flipX', 'frame', 'face', 'aim', 'gunAng', 'bodyAng', 'cur', 'fireCd', 'lean', 'sq', 'inv', 'dead', 'deadT', 'dashT', 'dashDir', 'chargeT', 'chargeWind', 'chargeDir', 'jumpT', 'chewT', 'breathT', 'hurtT', 'victoryT', 'lastFire', 'flash', 'speech', 'macT', 'wetT'],
+  mine: ['ammo', 'bombs', 'scraps', 'canCd', 'chargeCd', 'chiliCd', 'roastCd', 'slimeCd', 'stompCd', 'stompWind', 'dashCd', 'bombCd'],
+  en: ['id', 'type', 'x', 'y', 'z', 'vx', 'vy', 'hp', 'maxHp', 'dir', 'flipX', 'frame', 'act', 'face', 'sq', 'lean', 'flash', 'spawnT', 'spawnMax', 'leap', 'st', 'seed', 'sulkT', 'hypeT', 'downT', 'downMax', 'meltT', 'burnT', 'stuckT', 'cheese', 'fvx'],
+  bu: ['w', 'x', 'y', 'z', 'vx', 'vy', 'r', 'rot', 'seed', 'life', 'max'],
+  eb: ['kind', 'x', 'y', 'z', 'vx', 'vy', 'r', 'rot', 'life'],
+  pk: ['kind', 'x', 'y', 'z', 't', 'life', 'weapon', 'perch'],
+  bo: ['x', 'y', 'z', 'vx', 'vy', 'vz', 'g', 'rot'],
+  ro: ['text', 'x', 'y', 'z', 'vx', 'vy', 'rot', 'wob', 'delay', 'life', 'max'],
+  ca: ['kind', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'rot', 'delay'],
+  ac: ['x', 'y', 'r', 'life', 'seed'],
+  fl: ['x', 'y', 'z', 'vx', 'vy', 'size', 'life', 'max'],
+  we: ['x', 'y', 'r', 'life', 'max', 'seed'],
+  pu: ['x', 'y', 'r', 'life', 'max', 'seed'],
+};
+const pack = (arr, keys) => arr.map(o => keys.map(k => r2(o[k])));
+const unpack = (rows, keys) => (rows || []).map(v => { const o = {}; keys.forEach((k, i) => (o[k] = unInf(v[i]))); return o; });
+
+// events that clients replay themselves (floating text, sounds, death bursts, corpses, shakes)
+function netEvent(type, data, only) {
+  if (!NET || !NET.host) return;
+  for (const [id, q] of NET.evq) if (!only || only === id) { q.push([type, data]); if (q.length > 400) q.splice(0, q.length - 400); }
+}
+function netFx(p, kind) { if (NET && NET.host && p.id) netEvent('x', kind, p.id); }
+// record every sound the host plays so clients hear the same things
+const SfxRaw = {};
+for (const k of Object.keys(Sfx)) {
+  const desc = Object.getOwnPropertyDescriptor(Sfx, k);
+  if (!desc || typeof desc.value !== 'function' || ['unlock', 'toggle'].includes(k)) continue;
+  const f = desc.value; SfxRaw[k] = f;
+  Sfx[k] = (...a) => { netEvent('s', [k, ...a]); return f(...a); };
+}
+const playSfx = (k, a) => { const f = SfxRaw[k]; if (f) f(...a); };
+
+// ---------- host side ----------
+function takeRemoteInput(pl) {
+  const box = NET && NET.inputs.get(pl.id);
+  if (!box) return blankInput();
+  const I = { ...box.cur, ...box.once };
+  box.once = { dash: false, special: false, bomb: false, swap: 0, weapon: null };
+  return I;
+}
+function hostOnInput(from, I) {
+  let box = NET.inputs.get(from);
+  if (!box) NET.inputs.set(from, box = { cur: blankInput(), once: { dash: false, special: false, bomb: false, swap: 0, weapon: null } });
+  box.cur = { mx: I.mx || 0, my: I.my || 0, a: I.a || 0, fire: !!I.fire, aiming: !!I.aiming, tid: I.tid || 0, bx: I.bx ?? null, by: I.by ?? null };
+  if (I.dash) box.once.dash = true;
+  if (I.special) box.once.special = true;
+  if (I.bomb) box.once.bomb = true;
+  if (I.swap) box.once.swap = I.swap;
+  if (I.weapon) box.once.weapon = I.weapon;
+}
+function buildBase() {
+  return {
+    t: r2(time), wave, ws: waveState, score, kills, boss: boss ? boss.id : 0, banner: banner ? { text: banner.text, sub: banner.sub, t: r2(banner.t) } : null,
+    pl: pack(players, K.pl), en: pack(enemies, K.en), bu: pack(bullets, K.bu), eb: pack(ebullets, K.eb), pk: pack(pickups, K.pk), bo: pack(bombs, K.bo),
+    ro: pack(roasts, K.ro), ca: pack(cans, K.ca), ac: pack(acids, K.ac), fl: pack(flames.slice(-120), K.fl), we: pack(webs, K.we), pu: pack(puddles, K.pu),
+  };
+}
+function netHostTick(dt) {
+  if (!NET || !NET.host || (state !== 'play' && state !== 'paused')) return;
+  let base = null;
+  for (const id of NET.room.peerIds()) {
+    const relay = NET.room.isRelay(id), every = relay ? 1 / 8 : 1 / 20;
+    let last = NET.lastSent.get(id) ?? -1; if (last > time) last = -1;
+    if (time - last < every) continue;
+    NET.lastSent.set(id, time);
+    base = base || buildBase();
+    const pl = players.find(q => q.id === id);
+    const ev = NET.evq.get(id) || [];
+    NET.evq.set(id, []);
+    const msg = { k: 'snap', b: base, me: pl ? K.mine.map(k => r2(pl[k] && typeof pl[k] === 'object' ? { ...pl[k], gravy: 1e9 } : pl[k])) : null, ev };
+    NET.room.send(msg, id, true);
+  }
+  // new corpses go out as events once
+  for (const c of corpses) if (c._net) { c._net = false; netEvent('c', [c.name, c.row, c.frame, c.h, r2(c.x), r2(c.y), r2(c.z), r2(c.vx), r2(c.vy), r2(c.vz), r2(c.vrot), c.flip, c.life, c.mass, c.r]); }
+}
+
+// ---------- client side ----------
+function clientApply(msg) {
+  const b = msg.b; if (!b) return;
+  NET.lastSnap = performance.now();
+  wave = b.wave; waveState = b.ws; score = b.score; kills = b.kills;
+  banner = b.banner;
+  // players: others are smoothed toward the host; my own body is predicted locally and corrected
+  const seen = new Set();
+  for (const o of unpack(b.pl, K.pl)) {
+    seen.add(o.id);
+    let q = players.find(x => x.id === o.id);
+    if (!q) { q = makePlayer(o.ch, o.id, o.pname, 0, 1); players.push(q); }
+    if (q === me) {
+      const keep = ['x', 'y', 'vx', 'vy', 'dir', 'flipX', 'frame', 'face', 'aim', 'gunAng', 'bodyAng', 'lean', 'sq', 'lastFire', 'wetT'];
+      for (const k of K.pl) if (!keep.includes(k)) q[k] = o[k];
+      q.hx = o.x; q.hy = o.y; q.hz = o.z;
+      // the host is doing something that moves me (dash, charge, jump, knocked back, down) -> follow it closely
+      q.follow = o.dashT > 0 || o.chargeT > 0 || o.chargeWind > 0 || o.jumpT > 0 || o.dead || o.hurtT > 0;
+      if (o.lastFire < 0.1) q.lastFire = o.lastFire;
+    } else {
+      for (const k of K.pl) if (k !== 'x' && k !== 'y') q[k] = o[k];
+      q.hx = o.x; q.hy = o.y;
+      if (q.x === undefined || Math.hypot(q.x - o.x, q.y - o.y) > 300) { q.x = o.x; q.y = o.y; }
+    }
+  }
+  players = players.filter(q => seen.has(q.id));
+  if (msg.me && me) K.mine.forEach((k, i) => { let v = msg.me[i]; if (k === 'ammo' && v) v = { ...v, gravy: Infinity }; me[k] = v; });
+  // enemies by id, smoothed
+  const byId = new Map(enemies.map(e => [e.id, e]));
+  const next = [];
+  for (const o of unpack(b.en, K.en)) {
+    let e = byId.get(o.id);
+    const d = ENEMIES[o.type];
+    if (!e) { e = { ...o, d, r: d.r, h: d.h, mass: d.mass || 1, t: rand(0, 3), stride: 0, lastFrame: 0, leanV: 0, sqV: 0 }; }
+    else for (const k of K.en) if (k !== 'x' && k !== 'y' && k !== 'z') e[k] = o[k];
+    e.hx = o.x; e.hy = o.y; e.hz = o.z;
+    if (e.x === undefined || Math.hypot(e.x - o.x, e.y - o.y) > 250) { e.x = o.x; e.y = o.y; e.z = o.z; }
+    next.push(e);
+  }
+  enemies = next;
+  boss = b.boss ? enemies.find(e => e.id === b.boss) || null : null;
+  bullets = unpack(b.bu, K.bu); ebullets = unpack(b.eb, K.eb); pickups = unpack(b.pk, K.pk); bombs = unpack(b.bo, K.bo);
+  roasts = unpack(b.ro, K.ro); cans = unpack(b.ca, K.ca); acids = unpack(b.ac, K.ac); flames = unpack(b.fl, K.fl); webs = unpack(b.we, K.we); puddles = unpack(b.pu, K.pu);
+  for (const [type, d] of msg.ev || []) {
+    if (type === 'f') floaters.push({ x: d[0], y: d[1], text: d[2], color: d[3], life: d[4], max: d[4], size: d[5] });
+    else if (type === 's') playSfx(d[0], d.slice(1));
+    else if (type === 'k') deathBurst(d[0], d[1], d[2], d[3]);
+    else if (type === 'c') corpses.push({ name: d[0], row: d[1], frame: d[2], h: d[3], x: d[4], y: d[5], z: d[6], vx: d[7], vy: d[8], vz: d[9], rot: 0, vrot: d[10], flip: d[11], life: d[12], max: d[12], mass: d[13], r: d[14] });
+    else if (type === 'x') { if (d === 'hurt') { shake = Math.max(shake, 10); SfxRaw.hurt(); } if (d === 'down') { shake = 18; SfxRaw.over(); } }
+  }
+}
+// my own movement, predicted (same physics as updatePlayer's normal walking) so it responds instantly
+function predictMe(dt, I) {
+  const p = me;
+  if (p.dead || p.follow) {
+    p.x = lerp(p.x, p.hx ?? p.x, 1 - Math.exp(-dt * 18)); p.y = lerp(p.y, p.hy ?? p.y, 1 - Math.exp(-dt * 18));
+  } else {
+    const sp = p.speed * (inPond(p.x, p.y) ? 0.6 : 1), tvx = I.mx * sp, tvy = I.my * sp;
+    let dvx = tvx - p.vx, dvy = tvy - p.vy; const dl = Math.hypot(dvx, dvy), a = 2300 * dt;
+    if (dl > a) { dvx *= a / dl; dvy *= a / dl; }
+    p.vx += dvx; p.vy += dvy;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    collideProps(p);
+    p.x = clamp(p.x, p.r + 10, ARENA.w - p.r - 10); p.y = clamp(p.y, p.r + 30, ARENA.h - p.r - 10);
+    // stay honest: drift toward where the host says I am, snapping if way off
+    if (p.hx != null) { const ex = p.hx - p.x, ey = p.hy - p.y, ed = Math.hypot(ex, ey); if (ed > 160) { p.x = p.hx; p.y = p.hy; } else if (ed > 30) { p.x += ex * Math.min(1, dt * 3); p.y += ey * Math.min(1, dt * 3); } }
+  }
+  p.moving = Math.hypot(I.mx, I.my) > 0.1;
+  p.aim = I.a;
+  const spd = Math.hypot(p.vx, p.vy), aiming = p.lastFire < 0.7 || I.aiming || I.fire;
+  if (I.fire) p.lastFire = 0; else p.lastFire += dt;
+  const want = aiming ? p.aim : spd > 40 ? Math.atan2(p.vy, p.vx) : p.bodyAng;
+  p.bodyAng = angLerp(p.bodyAng, want, 1 - Math.exp(-dt * (aiming ? 22 : 12)));
+  p.gunAng = angLerp(p.gunAng, aiming ? p.aim : p.bodyAng + (Math.cos(p.bodyAng) >= 0 ? 0.35 : -0.35), 1 - Math.exp(-dt * 25));
+  p.face = Math.cos(p.bodyAng) >= 0 ? 1 : -1;
+  facing(p, Math.cos(p.bodyAng), Math.sin(p.bodyAng), dt);
+  const strideLen = p.h * 0.27;
+  p.stride += spd * dt;
+  if (spd > 25) p.frame = Math.floor(p.stride / strideLen) % 4;
+  else if (p.frame % 2 === 0) p.frame = (p.frame + 1) % 4;
+  if (p.frame !== p.lastFrame) { if (spd > 60 && p.frame % 2 === 0) { if (!inPond(p.x, p.y)) footstep(p.x, p.y, spd / sp0(p)); addFootprint(p, spd / sp0(p)); } p.lastFrame = p.frame; }
+}
+const sp0 = p => p.speed || 250;
+function clientUpdate(dt) {
+  time += dt;
+  // send my input ~30x a second (one-shot buttons go on the reliable channel so they're never lost)
+  player = me;
+  const I = localInput();
+  const o = NET.out;
+  Object.assign(o.cur, { mx: I.mx, my: I.my, a: r2(I.a), fire: I.fire, aiming: I.aiming, tid: I.tid, bx: I.bx == null ? null : Math.round(I.bx), by: I.by == null ? null : Math.round(I.by) });
+  for (const k of ['dash', 'special', 'bomb']) if (I[k]) o.once[k] = true;
+  if (I.swap) o.once.swap = I.swap; if (I.weapon) o.once.weapon = I.weapon;
+  o.t -= dt;
+  const hasOnce = o.once.dash || o.once.special || o.once.bomb || o.once.swap || o.once.weapon;
+  if (o.t <= 0 || hasOnce) {
+    o.t = NET.room.isRelay(NET.room.hostId) ? 1 / 12 : 1 / 30;
+    NET.room.send({ k: 'in', i: { ...o.cur, ...o.once } }, NET.room.hostId, !hasOnce);
+    o.once = { dash: false, special: false, bomb: false, swap: 0, weapon: null };
+  }
+  if (me) predictMe(dt, I);
+  // everyone else glides toward their latest snapshot position; shots keep flying between snapshots
+  const k = 1 - Math.exp(-dt * 14);
+  for (const q of players) if (q !== me && q.hx != null) { q.x = lerp(q.x, q.hx, k); q.y = lerp(q.y, q.hy, k); q.stride = (q.stride || 0) + Math.hypot(q.vx, q.vy) * dt; }
+  for (const e of enemies) { if (e.hx != null) { e.x = lerp(e.x, e.hx, k); e.y = lerp(e.y, e.hy, k); e.z = lerp(e.z, e.hz, k); } e.t = (e.t || 0) + dt; }
+  for (const b of bullets) { b.x += b.vx * dt; b.y += b.vy * dt; b.rot += dt * 18; }
+  for (const b of ebullets) { b.x += b.vx * dt; b.y += b.vy * dt; }
+  for (const b of bombs) { b.x += b.vx * dt; b.y += b.vy * dt; b.vz -= (b.g || 0) * dt; b.z = Math.max(0, b.z + b.vz * dt); }
+  for (const it of pickups) it.t += dt;
+  // purely cosmetic systems run locally
+  updateFire(dt);
+  if (yardSpr) updateYard(dt);
+  for (const pt of particles) {
+    pt.life -= dt; if (pt.ring || pt.ghost) continue;
+    pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.vz -= (pt.grav || 0) * dt; pt.z += pt.vz * dt;
+    if (pt.feather) { pt.vx *= Math.exp(-dt * 2); pt.vy *= Math.exp(-dt * 2); pt.vz = Math.max(pt.vz, -50); pt.rot += dt * 3; }
+    if (pt.z < 0 && !pt.smoke) { pt.z = 0; pt.vz *= -0.3; pt.vx *= 0.6; pt.vy *= 0.6; }
+  }
+  particles = particles.filter(pt => pt.life > 0);
+  for (const f of floaters) { f.life -= dt; f.y -= dt * 40; }
+  floaters = floaters.filter(f => f.life > 0);
+  updateCorpses(dt);
+  updateCamera(dt, isTouch && !mouse.active ? 0 : 1);
+  shake = Math.max(0, shake - dt * 40);
+  // the host vanished
+  if (state === 'play' && performance.now() - NET.lastSnap > 8000) netLost('Lost connection to the host.');
+}
+
+// ---------- lobby ----------
+function playerName() { return (store.get('tg_pname', '') || '').trim(); }
+function setPlayerName(v) { store.set('tg_pname', String(v || '').trim().slice(0, 14)); }
+function lobbyBroadcast() {
+  if (!NET || !NET.host) return;
+  const msg = { k: 'lobby', code: NET.room.code, roster: NET.roster, hostId: NET.room.id };
+  NET.room.send(msg);
+  renderLobby();
+}
+function netAttach(room) {
+  NET = { room, host: room.isHost, roster: [], inputs: new Map(), evq: new Map(), lastSent: new Map(), out: { cur: blankInput(), once: { dash: false, special: false, bomb: false, swap: 0, weapon: null }, t: 0 }, lastSnap: performance.now(), sendT: 0 };
+  if (room.isHost) {
+    NET.roster = [{ id: room.id, name: room.name, ch: null }];
+    room.onJoin((id, info) => {
+      if (state !== 'lobby' || NET.roster.length >= MAX_PLAYERS) { room.send({ k: 'reject', why: state !== 'lobby' ? 'That game has already started.' : 'That game is full.' }, id); return; }
+      NET.roster.push({ id, name: String(info.name || 'Player').slice(0, 14), ch: null });
+      NET.evq.set(id, []);
+      TGNet.setStatus(room.code, 'lobby', NET.roster.length);
+      setTimeout(lobbyBroadcast, 300);
+    });
+    room.onLeave(id => {
+      const r = NET.roster.find(x => x.id === id);
+      NET.roster = NET.roster.filter(x => x.id !== id); NET.evq.delete(id); NET.inputs.delete(id);
+      if (state === 'lobby') lobbyBroadcast();
+      else if (players) { const q = players.find(x => x.id === id); if (q) { floatText(q.x, q.y - 120, `${q.pname} left`, '#fff4dc', 2, 20); players = players.filter(x => x !== q); } }
+    });
+  } else {
+    room.onLeave(id => { if (id === room.hostId) netLost('The host left the game.'); });
+  }
+  room.on((msg, from) => netMessage(msg, from));
+}
+function netMessage(msg, from) {
+  if (!NET) return;
+  if (NET.host) {
+    if (msg.k === 'in' && state !== 'lobby') hostOnInput(from, msg.i);
+    else if (msg.k === 'pick' && state === 'lobby') { lobbyPick(from, msg.ch); }
+    else if (msg.k === 'hi') lobbyBroadcast();
+    return;
+  }
+  if (from !== NET.room.hostId) return;
+  if (msg.k === 'lobby') { NET.roster = msg.roster; NET.room.code = msg.code; if (state !== 'lobby' && state !== 'play') { state = 'lobby'; show('lobby'); } renderLobby(); }
+  else if (msg.k === 'reject') netLost(msg.why);
+  else if (msg.k === 'start') { NET.roster = msg.roster; beginNetGame(msg.level); }
+  else if (msg.k === 'snap' && (state === 'play' || state === 'paused')) clientApply(msg);
+  else if (msg.k === 'over') { score = msg.score; kills = msg.kills; wave = msg.wave; gameOver(); }
+}
+function lobbyPick(id, ch) {
+  if (!CHARS[ch]) return;
+  const r = NET.roster.find(x => x.id === id); if (!r) return;
+  if (NET.roster.some(x => x.ch === ch && x.id !== id)) return; // each character only once
+  r.ch = ch; lobbyBroadcast();
+}
+function renderLobby() {
+  if (!NET) return;
+  $('lobbyCode').textContent = NET.room.code;
+  const myId = NET.room.id, list = $('lobbyList'); list.innerHTML = '';
+  for (const r of NET.roster) {
+    const li = document.createElement('div'); li.className = 'lp' + (r.id === myId ? ' me' : '');
+    li.innerHTML = `<span class="pn"></span><span class="pc"></span>`;
+    li.querySelector('.pn').textContent = (r.id === (NET.host ? myId : NET.room.hostId) ? '👑 ' : '') + r.name + (r.id === myId ? ' (you)' : '');
+    li.querySelector('.pc').textContent = r.ch ? CHARS[r.ch].name : 'choosing…';
+    list.appendChild(li);
+  }
+  const wrap = $('lobbyCards'); wrap.innerHTML = '';
+  for (const k of CHAR_ORDER) {
+    const owner = NET.roster.find(x => x.ch === k), mine = owner && owner.id === myId;
+    const el = document.createElement('div'); el.className = 'lcard' + (mine ? ' sel' : owner ? ' taken' : '');
+    el.innerHTML = `<img src="assets/${k}.png" alt=""><div class="cn"></div><div class="by"></div>`;
+    el.querySelector('.cn').textContent = CHARS[k].name;
+    el.querySelector('.by').textContent = owner ? (mine ? 'You' : owner.name) : CHARS[k].role;
+    if (!owner || mine) el.addEventListener('click', () => { if (NET.host) lobbyPick(myId, k); else NET.room.send({ k: 'pick', ch: k }, NET.room.hostId); });
+    wrap.appendChild(el);
+  }
+  const ready = NET.roster.length >= 1 && NET.roster.every(r => r.ch);
+  $('lobbyStart').style.display = NET.host ? '' : 'none';
+  $('lobbyStart').disabled = !ready;
+  $('lobbyMsg').textContent = NET.host
+    ? (NET.roster.length < 2 ? 'Share the code — waiting for players to join…' : ready ? `${NET.roster.length} players ready!` : 'Waiting for everyone to pick a character…')
+    : 'Pick a character. The host starts the game.';
+  $('lobbyLinks').textContent = NET.room.linkInfo().filter(l => !l.direct).length ? 'Some players are connected through the relay (a little more lag).' : '';
+}
+function beginNetGame(level) {
+  testLevel = level || 0;
+  const roster = NET.roster.map(r => ({ id: r.id, name: r.name, ch: r.ch }));
+  Sfx.unlock();
+  sticks.move = sticks.aim = null;
+  newGame(roster, NET.room.id);
+  NET.lastSnap = performance.now();
+  state = 'play'; show(null);
+}
+function hostStart() {
+  if (!NET || !NET.host || !NET.roster.every(r => r.ch)) return;
+  NET.overSent = false;
+  for (const r of NET.roster) if (r.id !== NET.room.id) NET.evq.set(r.id, []);
+  NET.room.send({ k: 'start', roster: NET.roster, level: 0 });
+  TGNet.setStatus(NET.room.code, 'playing', NET.roster.length);
+  beginNetGame(0);
+}
+function netLost(why) {
+  if (!NET) return;
+  const room = NET.room; NET = null;
+  try { room.close(); } catch {}
+  state = 'title'; player = null; players = [];
+  show('multi'); $('multiMsg').textContent = why || '';
+}
+function leaveNet() {
+  if (!NET) return;
+  const room = NET.room;
+  if (NET.host) TGNet.setStatus(room.code, 'ended');
+  NET = null; try { room.close(); } catch {}
+}
+async function hostGame() {
+  const name = $('pnameMulti').value.trim(); if (!name) { $('multiMsg').textContent = 'Enter your name first.'; $('pnameMulti').focus(); return; }
+  setPlayerName(name);
+  $('multiMsg').textContent = 'Creating a game…';
+  try {
+    const room = await TGNet.createGame(name);
+    netAttach(room); state = 'lobby'; show('lobby'); renderLobby(); $('multiMsg').textContent = '';
+  } catch (e) { $('multiMsg').textContent = e.message || String(e); }
+}
+async function joinGame() {
+  const name = $('pnameMulti').value.trim(); if (!name) { $('multiMsg').textContent = 'Enter your name first.'; $('pnameMulti').focus(); return; }
+  setPlayerName(name);
+  const code = $('joinCode').value;
+  $('multiMsg').textContent = 'Joining…';
+  try {
+    const room = await TGNet.joinGame(code, name);
+    netAttach(room);
+    // wait for the host to let us in
+    const t0 = performance.now();
+    const wait = setInterval(() => {
+      if (!NET || NET.room !== room) return clearInterval(wait);
+      if (state === 'lobby') { clearInterval(wait); $('multiMsg').textContent = ''; return; }
+      if (performance.now() - t0 > 12000) { clearInterval(wait); netLost("Couldn't reach the host. Check the code and try again."); }
+    }, 300);
+  } catch (e) { $('multiMsg').textContent = e.message || String(e); }
+}
+
+// ---------- high scores ----------
+function submitScore() {
+  if (testLevel && !NET) return; // test mode runs don't count
+  if (NET && !NET.host) return;  // the host posts the team's score
+  if (score <= 0) return;
+  const list = players.map(q => `${q.pname || 'Player'} (${CHARS[q.ch].name})`).join(', ');
+  window.TGNet && TGNet.submitScore({ mode: NET ? 'multi' : 'single', score: Math.round(score), names: list, level: wave, kills, players: players.length });
+}
+async function showScores(mode) {
+  show('scores');
+  for (const b of document.querySelectorAll('#scoreTabs button')) b.classList.toggle('on', b.dataset.mode === mode);
+  const box = $('scoreList'); box.innerHTML = '<div class="hint">Loading…</div>';
+  if (!window.TGNet || !TGNet.available) { box.innerHTML = '<div class="hint">High scores need the online version of the game.</div>'; return; }
+  try {
+    const rows = await TGNet.topScores(mode, 15);
+    box.innerHTML = rows.length ? '' : '<div class="hint">No scores yet. Be the first!</div>';
+    rows.forEach((r, i) => {
+      const d = document.createElement('div'); d.className = 'srow';
+      d.innerHTML = `<span class="rk">${i + 1}</span><span class="nm"></span><span class="lv"></span><span class="sc"></span>`;
+      d.querySelector('.nm').textContent = r.names;
+      d.querySelector('.lv').textContent = `Lvl ${r.level || 1}`;
+      d.querySelector('.sc').textContent = Number(r.score).toLocaleString();
+      box.appendChild(d);
+    });
+  } catch (e) { box.innerHTML = '<div class="hint">Could not load scores right now.</div>'; }
+}
+
 // ---------- main loop ----------
 let last = performance.now();
 function frame(now) {
   let dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (state === 'play' || state === 'over') {
-    if (state === 'play') update(dt);
+  if (NET && !NET.host && (state === 'play' || state === 'paused')) clientUpdate(dt);
+  else if (state === 'play' || state === 'over' || (NET && state === 'paused')) {
+    if (state === 'play' || state === 'paused') { update(dt); netHostTick(dt); }
     else { // keep particles alive under the game over screen
-      time += dt; updateMisc(dt);
+      time += dt; if (!(NET && !NET.host)) updateMisc(dt);
     }
   }
   render();
   requestAnimationFrame(frame);
 }
+// opened from an invite link (?join=CODE)
+{
+  const jc = new URLSearchParams(location.search).get('join');
+  if (jc) { const go = () => openMulti(jc.toUpperCase()); if (window.TGNet) go(); else window.addEventListener('tgnet-ready', go, { once: true }); }
+}
 
-if (new URLSearchParams(location.search).has('debug')) window.__tg = { fp: () => prints.length, pk: () => pickups.filter(it => it.kind === 'medkit').map(it => ({ x: Math.round(it.x), y: Math.round(it.y), z: it.z })), fn: { assembleMac: () => assembleMac(), spawn: (t, x, y) => spawnEnemy(t, x, y), drop: (x, y, k) => dropPickup(x, y, k) }, get s() { return { state, wave, score, kills, player, cam, ZOOM, enemies: enemies && enemies.map(e => [e.type, Math.round(e.x), Math.round(e.y), e.spawnT, Math.round(e.hp), +(e.sulkT || 0).toFixed(1), +(e.hypeT || 0).toFixed(1), +(e.downT || 0).toFixed(1), +(e.meltT || 0).toFixed(1), +(e.burnT || 0).toFixed(1)]), bullets: bullets && bullets.length }; } };
+if (new URLSearchParams(location.search).has('debug')) window.__tg = { fp: () => prints.length, pk: () => pickups.filter(it => it.kind === 'medkit').map(it => ({ x: Math.round(it.x), y: Math.round(it.y), z: it.z })), fn: { assembleMac: () => assembleMac(), spawn: (t, x, y) => spawnEnemy(t, x, y), drop: (x, y, k) => dropPickup(x, y, k), igniteAll: () => enemies.forEach(e => igniteEnemy(e, 6)), fire: () => [fireParts.length, Math.round(Math.max(0, ...fireParts.map(p => p.z)))] }, get s() { return { state, wave, score, kills, player: me, players, NET, cam, ZOOM, enemies: enemies && enemies.map(e => [e.type, Math.round(e.x), Math.round(e.y), e.spawnT, Math.round(e.hp), +(e.sulkT || 0).toFixed(1), +(e.hypeT || 0).toFixed(1), +(e.downT || 0).toFixed(1), +(e.meltT || 0).toFixed(1), +(e.burnT || 0).toFixed(1)]), bullets: bullets && bullets.length }; } };
 loadAssets().then(() => { buildFloor(); requestAnimationFrame(frame); });
 })();
