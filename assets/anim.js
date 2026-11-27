@@ -262,5 +262,59 @@ window.ANIM = {
    "back": 4,
    "act": 4
   }
+ },
+ "mashboss": {
+  "cw": 374,
+  "ch": 312,
+  "ax": 186.3,
+  "ref": 300,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "gourdboss": {
+  "cw": 408,
+  "ch": 311,
+  "ax": 185.7,
+  "ref": 300,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "cornboss": {
+  "cw": 366,
+  "ch": 305,
+  "ax": 199.7,
+  "ref": 300,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
  }
 };

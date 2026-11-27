@@ -39,9 +39,7 @@
   .card:hover { transform:translateY(-4px); }
   .card.sel { background:linear-gradient(#ffe08a,#ffb347); transform:translateY(-6px); box-shadow:0 0 0 4px var(--gold), 0 8px 0 #3b2414; }
   .card img { height:130px; object-fit:contain; filter:drop-shadow(0 4px 2px #0004); pointer-events:none; }
-  .card input { font-family:'Lilita One',cursive; font-size:20px; color:var(--brown); text-align:center; width:100%;
-    border:none; border-bottom:2px dashed #3b241466; background:transparent; margin-top:6px; padding:2px; user-select:text; -webkit-user-select:text; }
-  .card input:focus { outline:none; border-bottom-color:var(--orange); }
+  .card .cname { font-family:'Lilita One',cursive; font-size:20px; color:var(--brown); text-align:center; width:100%; margin-top:6px; padding:2px; }
   .card .role { font-weight:800; font-size:13px; color:#8a3b12; text-transform:uppercase; letter-spacing:.5px; }
   .card .perk { font-size:12.5px; margin-top:4px; line-height:1.25; min-height:3em; }
   .card .stats { display:flex; gap:8px; font-size:11px; font-weight:800; margin-top:6px; opacity:.8; }
@@ -50,7 +48,7 @@
     #cards { grid-template-columns:repeat(2,1fr); gap:10px; margin:12px 0; }
     .card { padding:6px 6px 8px; border-radius:14px; }
     .card img { height:84px; }
-    .card input { font-size:17px; }
+    .card .cname { font-size:17px; }
     .card .role { font-size:11px; }
     .card .perk { font-size:11.5px; min-height:0; }
   }
@@ -66,9 +64,24 @@
   #touch.show { display:block; }
   .tbtn { position:absolute; pointer-events:auto; width:64px; height:64px; border-radius:50%; border:3px solid #fff8;
     background:#3b2414aa; display:flex; align-items:center; justify-content:center; font-family:'Lilita One'; font-size:12px; color:#fff; }
+  #tFire.down { background:#ff5a3acc !important; transform:scale(.92); }
   .tbtn img { width:40px; height:40px; object-fit:contain; pointer-events:none; }
   #tPause { top:max(10px,env(safe-area-inset-top)); right:50%; transform:translateX(50%); width:44px; height:44px; font-size:18px; }
   #topbtns { position:fixed; top:10px; right:10px; z-index:6; display:flex; gap:8px; }
+  .ibtn.wide { width:auto; padding:0 10px; font-family:'Lilita One'; font-size:14px; letter-spacing:.5px; background:#2f7a2acc; }
+  .ibtn.wide.off { background:#3b2414aa; }
+  #levels { background:radial-gradient(ellipse at center,#5b3416 0%,#2b1a10 75%); justify-content:flex-start; padding-top:24px; gap:10px; }
+  #levels h2 { font-size:clamp(28px,5vw,46px); color:var(--gold); text-shadow:0 3px 0 #8a3b12; }
+  #lvlGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px; width:100%; max-width:900px; margin:8px 0; }
+  .lvl { font-family:'Nunito'; background:linear-gradient(#fff4dc,#f1d9a8); color:var(--brown); border:3px solid #3b2414; border-radius:14px; padding:8px 6px;
+    cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; box-shadow:0 4px 0 #3b2414; }
+  .lvl b { font-family:'Lilita One'; font-size:26px; font-weight:400; line-height:1; }
+  .lvl span { font-size:12px; font-weight:800; line-height:1.15; }
+  .lvl.boss { background:linear-gradient(#ffb36a,#e8742a); }
+  .lvl:active { transform:translateY(3px); box-shadow:0 1px 0 #3b2414; }
+  .godrow { font-weight:800; display:flex; gap:8px; align-items:center; font-size:16px; }
+  .godrow input { width:22px; height:22px; }
+  @media (max-width:700px) { #lvlGrid { grid-template-columns:repeat(3,1fr); } .lvl span { font-size:11px; } }
   .ibtn { width:40px; height:40px; border-radius:12px; border:2px solid #fff6; background:#3b2414aa; color:#fff; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
 </style>
 </head>
@@ -80,6 +93,7 @@
   <div class="sub">The feast has turned against us. Grab the gravy. Defend the family.</div>
   <div class="bottom">
     <button class="btn" id="playBtn">PLAY</button>
+    <button class="btn alt" id="testBtn">TEST MODE</button>
     <div class="hint" id="ctrlHint"></div>
     <div class="hint" id="hiScore"></div>
   </div>
@@ -87,9 +101,15 @@
 
 <div id="select" class="screen">
   <h2>Choose Your Fighter</h2>
-  <div class="hint">Tap a name to rename them!</div>
   <div id="cards"></div>
   <button class="btn" id="goBtn">LET'S GOBBLE!</button>
+</div>
+
+<div id="levels" class="screen">
+  <h2>Test Mode: Pick a Level</h2>
+  <label class="godrow"><input type="checkbox" id="godChk"> Invincible</label>
+  <div id="lvlGrid"></div>
+  <button class="btn alt" id="lvlBack">Back</button>
 </div>
 
 <div id="pause" class="screen">
@@ -106,6 +126,7 @@
   <div class="row">
     <button class="btn" id="againBtn">Play Again</button>
     <button class="btn alt" id="charBtn">Change Fighter</button>
+    <button class="btn alt" id="overQuitBtn">Quit</button>
   </div>
 </div>
 
@@ -113,14 +134,17 @@
   <div class="tbtn" id="tBomb" style="right:112px;bottom:34px"><img src="assets/w_bomb.png" alt="bomb"></div>
   <div class="tbtn" id="tDash" style="right:24px;bottom:110px">DASH</div>
   <div class="tbtn" id="tSpecial" style="right:100px;bottom:112px;width:70px;height:70px;background:#c9541acc;display:none">CHARGE</div>
+  <div class="tbtn" id="tFire" style="right:18px;bottom:22px;width:84px;height:84px;font-size:18px;background:#c0392bcc;display:none">FIRE</div>
   <div class="tbtn" id="tSwap" style="right:24px;bottom:190px;width:54px;height:54px">SWAP</div>
 </div>
 <div id="topbtns">
+  <button class="ibtn wide" id="aimBtn" title="Auto-aim (T)" style="display:none">🎯 AIM ON</button>
+  <button class="ibtn wide" id="fireBtn" title="Auto-fire (R)" style="display:none">🔥 FIRE ON</button>
   <button class="ibtn" id="muteBtn" title="Mute (M)">🔊</button>
   <button class="ibtn" id="pauseBtn" title="Pause (Esc)" style="display:none">⏸</button>
 </div>
 
-<script src="assets/anim.js?v=9"></script>
-<script src="game.js?v=26"></script>
+<script src="assets/anim.js?v=10"></script>
+<script src="game.js?v=33"></script>
 </body>
 </html>

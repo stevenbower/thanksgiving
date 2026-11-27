@@ -17,7 +17,8 @@ const store = {
 
 // ---------- assets ----------
 const ASSET_NAMES = ['grandpa','grandma','teen','kidred','kidstripe','mama','pops','michelle','arthur','turkey','potato','corn','pumpkin','cranberry','boss',
-  'w_gravy','w_cran','w_corn','w_bomb','w_pie','hay','table','gravyboat','slice','w_mac','scrap','w_can','w_slime','w_chili'];
+  'w_gravy','w_cran','w_corn','w_bomb','w_pie','hay','table','gravyboat','slice','w_mac','scrap','w_can','w_slime','w_chili',
+  'mashboss','gourdboss','cornboss','medkit','d_firepit','d_blanket','d_flowerbed','d_patch','d_pond','d_mush','y_rocks','y_leaves','y_pumpkins','y_mums','y_lily'];
 const AN = window.ANIM || {};
 const IMG = {};
 const WHITE = {}; // white silhouettes for hit flashes
@@ -72,12 +73,12 @@ const ENEMIES = {
   pumpkin:   { img:'pumpkin',   hp:190, speed:52,  r:42, h:118, dmg:20, score:250, ai:'chase',  face:1, heavy:true, hip:0.8, mass:3, stride:0.24 },
   boss:      { img:'boss',      hp:2400,speed:95,  r:85, h:270, dmg:25, score:5000,ai:'boss',   face:-1, heavy:true, gobble:true, hip:0.78, mass:6, stride:0.26,
                boss:true, lvl:5,  bname:'GOBBLEZILLA',      moves:['charge','burst','summon'],          shot:'feather', summon:['turkey','turkey','cranberry','potato'] },
-  mashboss:  { img:'potato',    hp:3000,speed:85,  r:88, h:250, dmg:24, score:7000,ai:'boss',   face:1,  heavy:true, hip:0.8,  mass:6, stride:0.22,
-               boss:true, lvl:10, bname:'THE MASH MONSTER', moves:['slam','volley','summon','slam'],   shot:'gravy',   summon:['potato','tot','tot','potato'], crown:'#ffe14d', aura:'rgba(150,90,30,', gravy:true, crownAt:0.97 },
-  gourdboss: { img:'pumpkin',   hp:3800,speed:80,  r:98, h:285, dmg:28, score:9000,ai:'boss',   face:1,  heavy:true, hip:0.8,  mass:7, stride:0.24,
-               boss:true, lvl:15, bname:'THE GREAT GOURD',  moves:['roll','spiral','summon','roll'],   shot:'seed',    summon:['pumpkin','cranberry','cranberry'], crown:'#ffcf3a', aura:'rgba(255,120,20,', leaves:true, crownAt:0.8 },
-  cornboss:  { img:'corn',      hp:4600,speed:105, r:80, h:300, dmg:28, score:12000,ai:'boss',  face:1,  heavy:true, hip:0.8,  mass:6, stride:0.26,
-               boss:true, lvl:20, bname:'GENERAL COB',      moves:['volley','spiral','charge','summon'], shot:'kernel', summon:['corn','turkey','corn'], crown:'#ffe14d', aura:'rgba(255,230,80,', general:true, crownAt:0.84 },
+  mashboss:  { img:'mashboss',    hp:3000,speed:85,  r:88, h:250, dmg:24, score:7000,ai:'boss',   face:1,  heavy:true, hip:0.8,  mass:6, stride:0.22,
+               boss:true, lvl:10, bname:'THE MASH MONSTER', moves:['slam','volley','summon','slam'],   shot:'gravy',   summon:['potato','tot','tot','potato'], aura:'rgba(150,90,30,' },
+  gourdboss: { img:'gourdboss',   hp:3800,speed:80,  r:98, h:285, dmg:28, score:9000,ai:'boss',   face:1,  heavy:true, hip:0.8,  mass:7, stride:0.24,
+               boss:true, lvl:15, bname:'THE GREAT GOURD',  moves:['roll','spiral','summon','roll'],   shot:'seed',    summon:['pumpkin','cranberry','cranberry'], aura:'rgba(255,120,20,' },
+  cornboss:  { img:'cornboss',      hp:4600,speed:105, r:80, h:300, dmg:28, score:12000,ai:'boss',  face:1,  heavy:true, hip:0.8,  mass:6, stride:0.26,
+               boss:true, lvl:20, bname:'GENERAL COB',      moves:['volley','spiral','charge','summon'], shot:'kernel', summon:['corn','turkey','corn'], aura:'rgba(255,230,80,' },
 };
 
 const ARENA = { w: 2400, h: 1600 };
@@ -229,6 +230,8 @@ window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   keys[k] = true;
   if (k === ' ' ) { wantBomb = true; e.preventDefault(); }
+  if (k === 't' && state === 'play') setAuto(!autoAim, autoFire);
+  if (k === 'r' && state === 'play') setAuto(autoAim, !autoFire);
   if (k === 'shift') wantDash = true;
   if (k === 'q') wantSwap = -1;
   if (k === 'e') wantSwap = 1;
@@ -291,7 +294,7 @@ const endTouch = e => {
   Sfx.unlock();
   for (const t of e.changedTouches)
     for (const k of ['move', 'aim']) if (sticks[k] && sticks[k].id === t.identifier) sticks[k] = null;
-  if (e.touches.length === 0) { sticks.move = sticks.aim = null; }
+  if (e.touches.length === 0) { sticks.move = sticks.aim = null; fireHeld = false; fireTouch = null; $('tFire').classList.remove('down'); }
 };
 window.addEventListener('touchend', endTouch);
 window.addEventListener('touchcancel', endTouch);
@@ -305,13 +308,19 @@ tapBtn('tBomb', () => wantBomb = true);
 tapBtn('tDash', () => wantDash = true);
 tapBtn('tSwap', () => wantSwap = 1);
 tapBtn('tSpecial', () => wantSpecial = true);
+// FIRE button (shown when auto-fire is off): hold to shoot wherever you're aiming
+let fireHeld = false, fireTouch = null;
+{ const el = $('tFire');
+  el.addEventListener('touchstart', e => { e.stopPropagation(); e.preventDefault(); Sfx.unlock(); fireHeld = true; fireTouch = e.changedTouches[0].identifier; el.classList.add('down'); }, { passive: false });
+  const up = e => { for (const t of e.changedTouches) if (t.identifier === fireTouch) { fireHeld = false; fireTouch = null; el.classList.remove('down'); } };
+  window.addEventListener('touchend', up); window.addEventListener('touchcancel', up);
+  el.addEventListener('mousedown', e => { e.stopPropagation(); e.preventDefault(); fireHeld = true; el.classList.add('down'); });
+  window.addEventListener('mouseup', () => { if (fireTouch === null) { fireHeld = false; el.classList.remove('down'); } }); }
 
 // ---------- game state ----------
 let state = 'title';
 let selected = store.get('tg_char', 'grandpa');
-const OLD_DEFAULTS = ['Grandpa', 'The Professor', 'Cheeto Kid', "Lil' Stripes", 'Ben'];
-const names = Object.assign({}, ...CHAR_ORDER.map(k => ({ [k]: CHARS[k].name })),
-  Object.fromEntries(Object.entries(store.get('tg_names', {})).filter(([, v]) => !OLD_DEFAULTS.includes(v))));
+const names = Object.fromEntries(CHAR_ORDER.map(k => [k, CHARS[k].name])); // fixed names (renaming was removed)
 let tableT = 8, corpses = [], webs = [], roasts = [], cans = [], acids = [], flames = [];
 let player, enemies, bullets, ebullets, bombs, particles, puddles, pickups, floaters, props, spawnQueue;
 let wave, waveState, waveTimer, score, kills, shake, time, banner, boss, hitStop;
@@ -333,7 +342,7 @@ function newGame() {
   };
   enemies = []; bullets = []; ebullets = []; bombs = []; particles = []; puddles = []; pickups = []; floaters = []; corpses = []; webs = []; roasts = []; cans = []; acids = []; flames = []; tableT = 8;
   initYard();
-  spawnQueue = []; wave = Math.max(0, (parseInt(new URLSearchParams(location.search).get('wave')) || 1) - 1); score = 0; kills = 0; shake = 0; time = 0; banner = null; boss = null; hitStop = 0;
+  spawnQueue = []; wave = Math.max(0, (testLevel || parseInt(new URLSearchParams(location.search).get('wave')) || 1) - 1); score = 0; kills = 0; shake = 0; time = 0; banner = null; boss = null; hitStop = 0;
   props = makeProps();
   cam.x = player.x; cam.y = player.y;
   startWave();
@@ -435,7 +444,11 @@ function makeYardSprites() {
       g.fillStyle = mid; g.beginPath(); g.arc(0, 0, 3.4, 0, Math.PI * 2); g.fill();
     }));
   }
-  yardSpr = { leafs, pumps, heads };
+  // generated art strips (square cells) replace the hand-drawn fallbacks when they loaded
+  const cells = name => { const im = IMG[name]; if (!im) return null; const c = im.height, out = [];
+    for (let i = 0; i < Math.round(im.width / c); i++) out.push(mk(c, c, g => g.drawImage(im, i * c, 0, c, c, 0, 0, c, c))); return out; };
+  const gl = cells('y_leaves'), gp = cells('y_pumpkins'), gm = cells('y_mums');
+  yardSpr = { leafs: gl ? gl.concat(gl).slice(0, 12) : leafs, pumps: gp || pumps, heads: gm || heads, lily: cells('y_lily'), rocks: cells('y_rocks'), gen: !!gp };
 }
 
 function initYard() {
@@ -618,6 +631,7 @@ function drawPondWater() {
   for (let i = 0; i < 5; i++) {
     const lx = x + Math.cos(i * 2.3 + 1) * rx * 0.55 + Math.sin(time * 0.6 + i) * 3, ly = y + Math.sin(i * 2.3 + 1) * ry * 0.5 + Math.cos(time * 0.8 + i) * 1.5, lr = 11 + (i % 3) * 3;
     ctx.fillStyle = 'rgba(0,30,40,.25)'; ctx.beginPath(); ctx.ellipse(lx + 2, ly + 2, lr, lr * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+    if (yardSpr && yardSpr.lily) { const sp = yardSpr.lily[i === 1 ? 3 : i % 3], s2 = lr * 2.4; ctx.save(); ctx.translate(lx, ly); ctx.scale(1, 0.6); ctx.rotate(i * 1.7 + Math.sin(time * 0.5 + i) * 0.1); ctx.drawImage(sp, -s2 / 2, -s2 / 2, s2, s2); ctx.restore(); continue; }
     ctx.fillStyle = i % 2 ? '#4f9a2a' : '#5fae34'; ctx.beginPath(); ctx.ellipse(lx, ly, lr, lr * 0.55, 0, 0.35, Math.PI * 2 - 0.1); ctx.lineTo(lx, ly); ctx.closePath(); ctx.fill();
     ctx.strokeStyle = 'rgba(30,70,15,.6)'; ctx.lineWidth = 1; ctx.stroke();
     if (i === 1) { ctx.fillStyle = '#ffb6cf'; for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; ctx.beginPath(); ctx.ellipse(lx + Math.cos(a) * 3, ly - 3 + Math.sin(a) * 1.6, 3.5, 2, a, 0, Math.PI * 2); ctx.fill(); } ctx.fillStyle = '#ffe14d'; ctx.beginPath(); ctx.arc(lx, ly - 3, 1.8, 0, Math.PI * 2); ctx.fill(); }
@@ -649,7 +663,7 @@ function drawGourd(g) {
   ctx.save(); ctx.globalAlpha = 0.25; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(g.x, g.y, g.r * k, g.r * 0.45 * k, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   const sq = g.z <= 0 && Math.abs(g.vz) < 1 ? 1 : 1 + Math.min(0.15, Math.abs(g.vz) / 2500);
   ctx.save(); ctx.translate(g.x, g.y - g.z); ctx.rotate(g.spin); ctx.scale(1 / sq, sq);
-  ctx.drawImage(sp, -sz / 2, -sz * 0.86, sz, sz);
+  ctx.drawImage(sp, -sz / 2, -sz * (yardSpr.gen ? 0.94 : 0.86), sz, sz);
   ctx.restore();
 }
 
@@ -679,6 +693,7 @@ function drawCattail(c) {
 
 function drawRock(pr) {
   const k = pr.k, x = pr.x, y = pr.y + pr.d * 0.25;
+  if (yardSpr && yardSpr.rocks) { const sp = yardSpr.rocks[Math.floor(pr.seed) % yardSpr.rocks.length], w = 108 * k; ctx.drawImage(sp, x - w / 2, pr.y + pr.d * 0.5 - w, w, w); return; }
   ctx.save();
   ctx.fillStyle = '#7d7a72'; ctx.strokeStyle = '#3a3630'; ctx.lineWidth = 3;
   ctx.beginPath();
@@ -870,26 +885,36 @@ function onScreen(e, margin = 10) {
   return sx > margin && sx < VW - margin && sy > margin && sy < VH - margin;
 }
 
+// auto-aim and auto-fire are separate toggles (on-screen buttons, or T / R). Both default on for touch, off for mouse.
+const oldAuto = store.get('tg_auto', null);
+let autoAim = store.get('tg_autoaim', null) ?? oldAuto ?? isTouch, autoFire = store.get('tg_autofire', null) ?? oldAuto ?? isTouch;
+function setAuto(aim, fireOn) {
+  autoAim = aim; autoFire = fireOn; store.set('tg_autoaim', aim); store.set('tg_autofire', fireOn);
+  const a = $('aimBtn'), f = $('fireBtn');
+  a.textContent = aim ? '🎯 AIM ON' : '🎯 AIM OFF'; a.classList.toggle('off', !aim);
+  f.textContent = fireOn ? '🔥 FIRE ON' : '🔥 FIRE OFF'; f.classList.toggle('off', !fireOn);
+  $('tFire').style.display = fireOn ? 'none' : 'flex'; if (fireOn) fireHeld = false;
+}
 function aimInput() {
-  // returns {ax, ay, firing} in world-direction terms
-  const c = CHARS[player.ch];
+  // returns {a, fire} in world-direction terms
   if (sticks.aim) {
     const dx = sticks.aim.x - sticks.aim.ox, dy = sticks.aim.y - sticks.aim.oy;
     if (Math.hypot(dx, dy) > 12) return { a: Math.atan2(dy, dx), fire: true };
     return { a: player.aim, fire: false };
   }
-  if (isTouch && !mouse.active) {
-    // auto-aim + auto-fire at the nearest enemy
-    let best = null, bd = Infinity;
-    for (const e of enemies) {
-      if (e.spawnT > 0 || !onScreen(e)) continue;
-      const d = dist2(e, player); if (d < bd) { bd = d; best = e; }
-    }
-    if (best) return { a: Math.atan2(best.y - best.h * 0.35 - (player.y - 40), best.x - player.x), fire: true, target: best };
-    return { a: player.aim, fire: false };
+  const touchOnly = isTouch && !mouse.active;
+  if (!touchOnly && mouse.down) { const w = screenToWorld(mouse.x, mouse.y); return { a: Math.atan2(w.y - (player.y - 40), w.x - player.x), fire: true }; }
+  // nearest enemy on screen: the auto-aim target, and what auto-fire waits for
+  let best = null, bd = Infinity;
+  for (const e of enemies) {
+    if (e.spawnT > 0 || !onScreen(e)) continue;
+    const d = dist2(e, player); if (d < bd) { bd = d; best = e; }
   }
-  const w = screenToWorld(mouse.x, mouse.y);
-  return { a: Math.atan2(w.y - (player.y - 40), w.x - player.x), fire: mouse.down };
+  let a;
+  if (autoAim && best) a = Math.atan2(best.y - best.h * 0.35 - (player.y - 40), best.x - player.x);
+  else if (!touchOnly) { const w = screenToWorld(mouse.x, mouse.y); a = Math.atan2(w.y - (player.y - 40), w.x - player.x); }
+  else { const sp = Math.hypot(player.vx, player.vy); a = sp > 40 ? Math.atan2(player.vy, player.vx) : player.aim; } // gun follows travel direction
+  return { a, fire: (autoFire && !!best) || fireHeld, target: autoAim ? best : null };
 }
 
 function updatePlayer(dt) {
@@ -1537,6 +1562,7 @@ function updateBoss(e, dt, nx, ny, d) {
 function hurtPlayer(dmg, nx, ny) {
   const p = player;
   if (p.dead) return;
+  if (testLevel && testGod) { p.flash = 0.1; return; }
   p.hp -= dmg; p.inv = 0.9; p.flash = 0.15; p.hurtT = 0.28;
   p.vx += nx * 520; p.vy += ny * 520;
   p.sq = 0.18; p.sqV = 0; p.leanV += (nx >= 0 ? 1 : -1) * 6;
@@ -2285,31 +2311,6 @@ function drawCheeseWeb(e) {
   ctx.restore();
 }
 
-function drawRegalia(e, d) {
-  const top = e.y - e.z - e.h * (d.crownAt || 1) * (1 - e.sq * 0.6) + 6, cx = e.x + (e.flipX ? -1 : 1) * e.h * 0.02;
-  ctx.save();
-  if (d.gravy) { // gravy erupting from the top of the mash, running down its sides
-    ctx.fillStyle = '#7a4416'; ctx.strokeStyle = '#3b2010'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.ellipse(cx, top + 22, e.r * 0.62, 20, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    for (let i = 0; i < 5; i++) { const xx = cx + (i - 2) * e.r * 0.26, dl = 18 + ((e.t * 22 + i * 13) % 34); ctx.beginPath(); ctx.ellipse(xx, top + 26 + dl * 0.5, 6, dl * 0.5, 0, 0, Math.PI * 2); ctx.fill(); }
-    ctx.fillStyle = '#ffe680'; ctx.strokeStyle = '#b08a20'; ctx.beginPath(); ctx.roundRect(cx - 26, top - 4, 52, 22, 5); ctx.fill(); ctx.stroke(); // the butter-pat crown
-  }
-  if (d.leaves) { for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + (i - 2.5) * 0.45; ctx.save(); ctx.translate(cx + Math.cos(a) * 30, top + 18 + Math.sin(a) * 14); ctx.rotate(a + Math.PI / 2); ctx.fillStyle = i % 2 ? '#c0392b' : '#e8892a'; ctx.beginPath(); ctx.ellipse(0, -10, 8, 16, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); } }
-  if (d.general) { // a general's cap
-    ctx.fillStyle = '#3d5a22'; ctx.strokeStyle = '#1f2e10'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.ellipse(cx, top + 14, 40, 12, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.roundRect(cx - 28, top - 16, 56, 30, 10); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#ffd84a'; ctx.beginPath(); for (let k = 0; k < 10; k++) { const rr = k % 2 ? 5 : 11, aa = -Math.PI / 2 + k * Math.PI / 5; ctx.lineTo(cx + Math.cos(aa) * rr, top - 1 + Math.sin(aa) * rr); } ctx.closePath(); ctx.fill();
-  } else {
-    // golden crown
-    const w = 44, y0 = top + (d.gravy ? -4 : 8);
-    ctx.fillStyle = d.crown; ctx.strokeStyle = '#7a5a10'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(cx - w / 2, y0); ctx.lineTo(cx - w / 2, y0 - 22); ctx.lineTo(cx - w / 4, y0 - 10); ctx.lineTo(cx, y0 - 28); ctx.lineTo(cx + w / 4, y0 - 10); ctx.lineTo(cx + w / 2, y0 - 22); ctx.lineTo(cx + w / 2, y0); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#d6332a'; ctx.beginPath(); ctx.arc(cx, y0 - 8, 4, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.restore();
-}
-
 function drawDizzy(e) {
   const cx = e.x, cy = e.y - e.z - e.h * 0.45 - 10;
   for (let i = 0; i < 3; i++) {
@@ -2398,30 +2399,33 @@ function buildWorldFloor(tile) {
   // scattered fallen leaves
   for (let c = 0; c < 90; c++) { const cx = RR(0, W), cy = RR(0, H); for (let i = 0; i < 14; i++) { const x = cx + RR(-60, 60), y = cy + RR(-40, 40); g.save(); g.translate(x, y); g.rotate(RR(0, 6.3)); g.fillStyle = pick3(R(), ['#c0392b', '#e8892a', '#f2c14e', '#8a3a1a', '#d4622a']); g.globalAlpha = RR(0.5, 0.95); g.beginPath(); g.ellipse(0, 0, RR(4, 8), RR(2, 4), 0, 0, Math.PI * 2); g.fill(); g.restore(); } }
   g.globalAlpha = 1;
-  // pond bed: muddy bank + stones (the water itself is drawn live)
-  { const [x, y, rx, ry] = MAP.pond;
+  // generated ground decals, centred on a spot; procedural fallbacks below run only if an image is missing
+  const decal = (name, x, y, w, rot = 0) => { const im = IMG[name]; if (!im) return false; const h = w * im.height / im.width; g.save(); g.translate(x, y); g.rotate(rot); g.drawImage(im, -w / 2, -h / 2, w, h); g.restore(); return true; };
+  // pond bed: stone rim + bank (the water itself is drawn live, lined up with the decal's own water)
+  if (IMG.d_pond) { const [x, y, rx, ry] = MAP.pond, im = IMG.d_pond, sx = rx * 2 / 363 * 1.04, sy = ry * 2 / 191 * 1.06; g.drawImage(im, x - 261.5 * sx, y - 166.5 * sy, im.width * sx, im.height * sy); }
+  else { const [x, y, rx, ry] = MAP.pond;
     g.fillStyle = '#5a4630'; g.beginPath(); g.ellipse(x, y + 6, rx + 18, ry + 14, 0, 0, Math.PI * 2); g.fill();
     for (let i = 0; i < 26; i++) { const a = (i / 26) * Math.PI * 2, sx = x + Math.cos(a) * (rx + 12), sy = y + Math.sin(a) * (ry + 9); const sg = g.createLinearGradient(sx, sy - 8, sx, sy + 8); sg.addColorStop(0, '#b4b0a4'); sg.addColorStop(1, '#6a665e'); g.fillStyle = sg; g.strokeStyle = '#3a3630'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(sx, sy, RR(9, 14), RR(6, 9), RR(-0.3, 0.3), 0, Math.PI * 2); g.fill(); g.stroke(); } }
   // fire pit stones + ash
-  { const [x, y] = MAP.firepit; g.fillStyle = '#3a2a20'; g.beginPath(); g.ellipse(x, y, 40, 22, 0, 0, Math.PI * 2); g.fill();
+  if (!decal('d_firepit', MAP.firepit[0], MAP.firepit[1] - 4, 150)) { const [x, y] = MAP.firepit; g.fillStyle = '#3a2a20'; g.beginPath(); g.ellipse(x, y, 40, 22, 0, 0, Math.PI * 2); g.fill();
     for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.fillStyle = pick3(R(), ['#8d8a80', '#a6a297', '#6f6c64']); g.strokeStyle = '#2a2622'; g.lineWidth = 2; g.beginPath(); g.ellipse(x + Math.cos(a) * 46, y + Math.sin(a) * 26, 12, 8, 0, 0, Math.PI * 2); g.fill(); g.stroke(); }
     g.strokeStyle = '#5a3a1c'; g.lineWidth = 9; g.beginPath(); g.moveTo(x - 24, y + 6); g.lineTo(x + 22, y - 6); g.moveTo(x - 20, y - 6); g.lineTo(x + 24, y + 6); g.stroke(); }
   // picnic blankets
-  for (const [x, y, rot] of MAP.blankets) { g.save(); g.translate(x, y); g.rotate(rot); g.scale(1, 0.62); const n = 6, sz = 26; for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { g.fillStyle = (i + j) % 2 ? '#f4efe4' : '#c63b2e'; g.fillRect((i - n / 2) * sz, (j - n / 2) * sz, sz, sz); } g.strokeStyle = 'rgba(60,20,10,.5)'; g.lineWidth = 3; g.strokeRect(-n / 2 * sz, -n / 2 * sz, n * sz, n * sz); g.restore();
+  for (const [x, y, rot] of MAP.blankets) { if (decal('d_blanket', x, y, 230, rot * 0.5)) continue; g.save(); g.translate(x, y); g.rotate(rot); g.scale(1, 0.62); const n = 6, sz = 26; for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { g.fillStyle = (i + j) % 2 ? '#f4efe4' : '#c63b2e'; g.fillRect((i - n / 2) * sz, (j - n / 2) * sz, sz, sz); } g.strokeStyle = 'rgba(60,20,10,.5)'; g.lineWidth = 3; g.strokeRect(-n / 2 * sz, -n / 2 * sz, n * sz, n * sz); g.restore();
     g.fillStyle = '#e8a03a'; g.strokeStyle = '#6b3d1a'; g.lineWidth = 2; g.beginPath(); g.ellipse(x + 20, y - 6, 20, 11, 0, 0, Math.PI * 2); g.fill(); g.stroke(); g.fillStyle = '#fff'; g.beginPath(); g.ellipse(x + 20, y - 9, 6, 3, 0, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#e8e2d4'; g.beginPath(); g.ellipse(x - 30, y + 8, 9, 6, 0, 0, Math.PI * 2); g.fill(); g.stroke(); }
   // leaf piles are live now: just a slightly flattened, darker patch of grass under each
   for (const [x, y] of MAP.leafpiles) { const gr = g.createRadialGradient(x, y, 5, x, y, 80); gr.addColorStop(0, 'rgba(60,40,15,.3)'); gr.addColorStop(1, 'rgba(60,40,15,0)'); g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, 85, 48, 0, 0, Math.PI * 2); g.fill(); }
   // flower beds of autumn mums
-  for (const [x, y] of MAP.flowers) { g.fillStyle = '#4a3020'; g.beginPath(); g.ellipse(x, y, 62, 34, 0, 0, Math.PI * 2); g.fill(); for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; g.fillStyle = '#9a968c'; g.beginPath(); g.ellipse(x + Math.cos(a) * 64, y + Math.sin(a) * 36, 8, 5, 0, 0, Math.PI * 2); g.fill(); }
+  for (const [x, y] of MAP.flowers) { if (decal('d_flowerbed', x, y + 2, 150)) continue; g.fillStyle = '#4a3020'; g.beginPath(); g.ellipse(x, y, 62, 34, 0, 0, Math.PI * 2); g.fill(); for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; g.fillStyle = '#9a968c'; g.beginPath(); g.ellipse(x + Math.cos(a) * 64, y + Math.sin(a) * 36, 8, 5, 0, 0, Math.PI * 2); g.fill(); }
     for (let i = 0; i < 40; i++) { const a = R() * 6.3, d = Math.sqrt(R()), fx = x + Math.cos(a) * d * 52, fy = y + Math.sin(a) * d * 27; g.fillStyle = pick3(R(), ['#2f5a1a', '#3f6b22', '#4f7a2a']); g.beginPath(); g.ellipse(fx, fy, RR(5, 9), RR(3, 5), RR(0, 3), 0, Math.PI * 2); g.fill(); } }
   // little pumpkin patches
-  for (const [x, y] of MAP.patches) { g.fillStyle = 'rgba(60,40,20,.55)'; g.beginPath(); g.ellipse(x, y, 110, 52, 0, 0, Math.PI * 2); g.fill();
+  for (const [x, y] of MAP.patches) { if (decal('d_patch', x, y, 250)) continue; g.fillStyle = 'rgba(60,40,20,.55)'; g.beginPath(); g.ellipse(x, y, 110, 52, 0, 0, Math.PI * 2); g.fill();
     g.strokeStyle = '#3f7a22'; g.lineWidth = 4; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(x + RR(-90, 90), y + RR(-40, 40)); g.bezierCurveTo(x + RR(-90, 90), y + RR(-40, 40), x + RR(-90, 90), y + RR(-40, 40), x + RR(-90, 90), y + RR(-40, 40)); g.stroke(); }
     for (let i = 0; i < 9; i++) { const lx = x + RR(-90, 90), ly = y + RR(-38, 38); g.fillStyle = '#4f9a2a'; g.beginPath(); g.ellipse(lx, ly, 12, 8, RR(0, 3), 0, Math.PI * 2); g.fill(); }
   }
   // fairy rings of mushrooms
-  for (const [x, y] of MAP.mushrooms) for (let i = 0; i < 11; i++) { const a = i / 11 * Math.PI * 2, mx = x + Math.cos(a) * 54, my = y + Math.sin(a) * 30; g.fillStyle = '#efe6d2'; g.fillRect(mx - 2.5, my - 6, 5, 8); g.fillStyle = i % 3 ? '#c0392b' : '#d9a066'; g.beginPath(); g.ellipse(mx, my - 7, 9, 6, 0, Math.PI, 0); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(mx - 3, my - 9, 1.6, 0, Math.PI * 2); g.fill(); }
+  for (const [x, y] of MAP.mushrooms) if (!decal('d_mush', x, y - 4, 150)) for (let i = 0; i < 11; i++) { const a = i / 11 * Math.PI * 2, mx = x + Math.cos(a) * 54, my = y + Math.sin(a) * 30; g.fillStyle = '#efe6d2'; g.fillRect(mx - 2.5, my - 6, 5, 8); g.fillStyle = i % 3 ? '#c0392b' : '#d9a066'; g.beginPath(); g.ellipse(mx, my - 7, 9, 6, 0, Math.PI, 0); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(mx - 3, my - 9, 1.6, 0, Math.PI * 2); g.fill(); }
   // tufts of grass everywhere
   for (let i = 0; i < 900; i++) { const x = RR(0, W), y = RR(0, H); g.strokeStyle = pick3(R(), ['rgba(60,90,25,.6)', 'rgba(120,140,40,.55)', 'rgba(40,60,20,.5)']); g.lineWidth = 1.6; g.beginPath(); for (let k = -2; k <= 2; k++) { g.moveTo(x + k * 2, y); g.lineTo(x + k * 3 + RR(-1, 1), y - RR(5, 11)); } g.stroke(); }
   worldFloor = cvs;
@@ -2602,7 +2606,6 @@ function drawEnemyBody(e) {
   if (e.meltT > 0) { const k = Math.min(1, e.meltT / 0.5); msy *= 1 - 0.22 * k + Math.sin(e.t * 5) * 0.03 * k; msx *= 1 + 0.14 * k; }
   const ok = drawAnim(name, row, frame, e.x + shiver, ey, e.h, e.flipX, { sx: msx, sy: msy, rot, flash: e.flash, alpha });
   if (!ok) drawSprite(name, e.x, e.y - e.z, e.h, e.face !== d.face, { sx: ssx, sy: ssy, rot: e.lean, flash: e.flash, alpha });
-  if (d.boss && d.crown) drawRegalia(e, d);
   if (e.stuckT > 0) drawCheeseWeb(e);
   if (e.downT > 0) drawDizzy(e);
   if (e.hypeT > 0) drawZaps(e);
@@ -2677,6 +2680,7 @@ function drawMedkit(x, y, t) {
   const pulse = 1 + Math.sin(t * 5) * 0.06; ctx.translate(x, y - 14); ctx.scale(pulse, pulse);
   const g = ctx.createRadialGradient(0, 0, 4, 0, 0, 40); g.addColorStop(0, 'rgba(120,255,140,.55)'); g.addColorStop(1, 'rgba(120,255,140,0)');
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 40, 0, Math.PI * 2); ctx.fill();
+  if (IMG.medkit) { const im = IMG.medkit, h = 46, w = h * im.width / im.height; ctx.drawImage(im, -w / 2, -h * 0.62, w, h); ctx.restore(); return; }
   ctx.fillStyle = '#fff'; ctx.strokeStyle = '#2b1a10'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.roundRect(-17, -13, 34, 26, 6); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#9a6a3a'; ctx.fillRect(-7, -18, 14, 5); ctx.strokeRect(-7, -18, 14, 5);
@@ -2951,6 +2955,7 @@ function show(id) {
     if (B) { tb.textContent = B[0]; tb.style.background = B[1]; }
   }
   $('pauseBtn').style.display = state === 'play' ? 'flex' : 'none';
+  for (const id of ['aimBtn', 'fireBtn']) $(id).style.display = state === 'play' || state === 'paused' ? 'flex' : 'none';
 }
 
 function buildCards() {
@@ -2959,15 +2964,13 @@ function buildCards() {
     const c = CHARS[k];
     const el = document.createElement('div');
     el.className = 'card' + (k === selected ? ' sel' : '');
-    el.innerHTML = `<img src="assets/${k}.png" alt=""><input maxlength="16" aria-label="Name"><div class="role"></div><div class="perk"></div>
+    el.innerHTML = `<img src="assets/${k}.png" alt=""><div class="cname"></div><div class="role"></div><div class="perk"></div>
       <div class="stats"><span>❤ ${c.hp}</span><span>⚡ ${c.speed}</span></div>`;
-    const inp = el.querySelector('input'); inp.value = names[k];
+    el.querySelector('.cname').textContent = names[k];
     el.querySelector('.role').textContent = c.role;
     el.querySelector('.perk').textContent = c.perk;
-    inp.addEventListener('input', () => { names[k] = inp.value.trim() || CHARS[k].name; store.set('tg_names', names); });
-    inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') inp.blur(); });
     el.addEventListener('click', () => { selected = k; store.set('tg_char', k); for (const c2 of wrap.children) c2.classList.remove('sel'); el.classList.add('sel'); });
-    el.addEventListener('dblclick', e => { if (e.target !== inp) startGame(); });
+    el.addEventListener('dblclick', startGame);
     wrap.appendChild(el);
   }
 }
@@ -2994,17 +2997,39 @@ function gameOver() {
   const isHi = score > hi; if (isHi) store.set('tg_hi', score);
   $('overTitle').textContent = pick(['STUFFED!', 'GOBBLED UP!', 'YOU GOT BASTED!', 'TOAST!']);
   $('overStats').innerHTML = '';
-  const lines = [`${names[player.ch]} survived to wave ${wave}`, `Score: ${score.toLocaleString()}${isHi ? '  🏆 NEW BEST!' : ''}`, `Foes defeated: ${kills}`, `Best: ${Math.max(hi, score).toLocaleString()}`];
+  const lines = [`${names[player.ch]} made it to level ${wave}`, `Score: ${score.toLocaleString()}${isHi ? '  🏆 NEW BEST!' : ''}`, `Foes defeated: ${kills}`, `Best: ${Math.max(hi, score).toLocaleString()}`];
   for (const l of lines) { const d = document.createElement('div'); d.textContent = l; $('overStats').appendChild(d); }
   setTimeout(() => show('over'), 250);
 }
 
-$('playBtn').addEventListener('click', () => { Sfx.unlock(); state = 'select'; buildCards(); show('select'); });
+$('playBtn').addEventListener('click', () => { Sfx.unlock(); testLevel = 0; state = 'select'; buildCards(); show('select'); });
+// ---------- test mode: jump straight to any level (optionally invincible) ----------
+let testLevel = 0, testGod = store.get('tg_god', false);
+function buildLevels() {
+  const wrap = $('lvlGrid'); wrap.innerHTML = '';
+  for (let n = 1; n <= 25; n++) {
+    const L = levelOf(n), b = document.createElement('button');
+    b.className = 'lvl' + (L.boss ? ' boss' : '');
+    b.innerHTML = `<b>${n}</b><span></span>`;
+    b.querySelector('span').textContent = L.boss ? ENEMIES[L.boss].bname : L.name;
+    b.addEventListener('click', () => { testLevel = n; state = 'select'; buildCards(); show('select'); });
+    wrap.appendChild(b);
+  }
+  $('godChk').checked = testGod;
+}
+$('testBtn').addEventListener('click', () => { Sfx.unlock(); buildLevels(); show('levels'); });
+$('lvlBack').addEventListener('click', () => show('title'));
+$('godChk').addEventListener('change', e => { testGod = e.target.checked; store.set('tg_god', testGod); });
+$('aimBtn').addEventListener('click', e => { e.currentTarget.blur(); setAuto(!autoAim, autoFire); });
+$('fireBtn').addEventListener('click', e => { e.currentTarget.blur(); setAuto(autoAim, !autoFire); });
+setAuto(autoAim, autoFire);
 $('goBtn').addEventListener('click', startGame);
 $('againBtn').addEventListener('click', startGame);
 $('charBtn').addEventListener('click', () => { state = 'select'; buildCards(); show('select'); });
 $('resumeBtn').addEventListener('click', togglePause);
-$('quitBtn').addEventListener('click', () => { state = 'title'; player = null; show('title'); refreshTitle(); });
+function quitToTitle() { state = 'title'; player = null; testLevel = 0; show('title'); refreshTitle(); }
+$('quitBtn').addEventListener('click', quitToTitle);
+$('overQuitBtn').addEventListener('click', quitToTitle);
 $('muteBtn').addEventListener('click', toggleMute);
 $('pauseBtn').addEventListener('click', togglePause);
 $('muteBtn').textContent = Sfx.muted ? '🔇' : '🔊';
@@ -3015,7 +3040,7 @@ function refreshTitle() {
 }
 $('ctrlHint').textContent = isTouch
   ? 'Left thumb moves · Right thumb aims & fires (or let it auto-fire) · Tap the bomb to throw stuffing'
-  : 'WASD move · Mouse aim · Click fire · Space stuffing bomb · Shift dash · Q/E or 1–4 swap weapons · F special';
+  : 'WASD move · Mouse aim · Click fire · Space stuffing bomb · Shift dash · Q/E or 1–4 swap weapons · F special · T auto-aim · R auto-fire';
 $('title').style.backgroundImage = "url('assets/title.jpg')";
 refreshTitle();
 
