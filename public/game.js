@@ -48,9 +48,9 @@ const CHARS = {
   teen:      { name:'Eli',          role:'Junkyard Inventor', hp:100, speed:265, perk:'Picks up junk scraps. Collect 5 and he builds a Mac & Cheese Blaster that traps enemies in sticky cheese webs for 10s!', rateMul:0.85, startCorn:250, special:'scrap' },
   kidred:    { name:'Issac',        role:'Human Cannonball', hp:85,  speed:315, perk:'Super speedy. SPECIAL: winds up, then charges like crazy, smashing through enemy after enemy!', dashCd:0.45, special:'charge' },
   kidstripe: { name:'Benny',        role:'Trash Talker',    hp:90,  speed:290, perk:'Bigger Stuffing Bombs and a big mouth. SPECIAL: hurls insults so mean they hurt, and enemies run away crying!', bombs:6, bombMul:1.5, special:'taunt' },
-  mama:      { name:'Mama',         role:'Caffeine Queen',  hp:105, speed:280, perk:'SPECIAL: hurls fizzing energy drink cans. Anything splashed goes bonkers and attacks the other enemies!', special:'can' },
-  pops:      { name:'Pops',         role:'The Big Stomp',   hp:140, speed:250, perk:'Tough as a turkey leg. SPECIAL: a giant jump that lands with a shockwave, knocking every enemy flat on their backs!', special:'stomp' },
-  michelle:  { name:'Aunty Michelle', role:'Slime Slinger', hp:100, speed:275, perk:'SPECIAL: lobs balls of acid slime that melt enemies into gooey, harmless puddles of themselves!', special:'slime' },
+  mama:      { name:'Raquel',       role:'Caffeine Queen',  hp:105, speed:280, perk:'SPECIAL: hurls fizzing energy drink cans. Anything splashed goes bonkers and attacks the other enemies!', special:'can' },
+  pops:      { name:'Steve',        role:'The Big Stomp',   hp:140, speed:250, perk:'Tough as a turkey leg. SPECIAL: a giant jump that lands with a shockwave, knocking every enemy flat on their backs!', special:'stomp' },
+  michelle:  { name:'Michelle',       role:'Slime Slinger', hp:100, speed:275, perk:'SPECIAL: lobs balls of acid slime that melt enemies into gooey, harmless puddles of themselves!', special:'slime' },
   arthur:    { name:'Arthur',       role:'Hot Mouth',       hp:115, speed:265, perk:'SPECIAL: pops a chili pepper and breathes a roaring blast of fire for 5 seconds!', special:'chili' },
 };
 const CHAR_ORDER = ['grandpa','grandma','pops','mama','michelle','arthur','teen','kidred','kidstripe'];
@@ -1161,7 +1161,7 @@ function updatePlayer(dt) {
   // ----- Mama: energy drink cans -----
   if (I.special && c.special === 'can' && p.canCd <= 0 && !p.dead) hurlCans(p);
   p.canCd -= dt;
-  // ----- Aunty Michelle: acid slime balls -----
+  // ----- Michelle: acid slime balls -----
   if (I.special && c.special === 'slime' && p.slimeCd <= 0 && !p.dead) hurlCans(p, 'slime');
   p.slimeCd -= dt;
   // ----- Arthur: chili pepper -> fire breath -----
