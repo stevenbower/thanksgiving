@@ -316,5 +316,197 @@ window.ANIM = {
    "back": 4,
    "act": 4
   }
+ },
+ "taylor": {
+  "cw": 175,
+  "ch": 206,
+  "ax": 86.5,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "zoe": {
+  "cw": 215,
+  "ch": 206,
+  "ax": 97.9,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "jay": {
+  "cw": 201,
+  "ch": 206,
+  "ax": 129.1,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "sarah": {
+  "cw": 204,
+  "ch": 206,
+  "ax": 126.0,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "izzy": {
+  "cw": 194,
+  "ch": 206,
+  "ax": 111.6,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "david": {
+  "cw": 199,
+  "ch": 206,
+  "ax": 87.4,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "peter": {
+  "cw": 218,
+  "ch": 206,
+  "ax": 98.6,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "eric": {
+  "cw": 192,
+  "ch": 206,
+  "ax": 121.4,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "robyn": {
+  "cw": 211,
+  "ch": 206,
+  "ax": 94.0,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "madison": {
+  "cw": 204,
+  "ch": 206,
+  "ax": 87.1,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "jaylucha": {
+  "cw": 181,
+  "ch": 208,
+  "ax": 97.4,
+  "ref": 180,
+  "rows": {
+   "act": 0
+  },
+  "n": {
+   "act": 4
+  }
  }
 };

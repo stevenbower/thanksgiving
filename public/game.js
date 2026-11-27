@@ -18,7 +18,8 @@ const store = {
 // ---------- assets ----------
 const ASSET_NAMES = ['grandpa','grandma','teen','kidred','kidstripe','mama','pops','michelle','arthur','turkey','potato','corn','pumpkin','cranberry','boss',
   'w_gravy','w_cran','w_corn','w_bomb','w_pie','hay','table','gravyboat','slice','w_mac','scrap','w_can','w_slime','w_chili',
-  'mashboss','gourdboss','cornboss','medkit','d_firepit','d_blanket','d_flowerbed','d_patch','d_pond','d_mush','y_rocks','y_leaves','y_pumpkins','y_mums','y_lily'];
+  'mashboss','gourdboss','cornboss','medkit','d_firepit','d_blanket','d_flowerbed','d_patch','d_pond','d_mush','y_rocks','y_leaves','y_pumpkins','y_mums','y_lily',
+  'david','peter','eric','robyn','madison','taylor','zoe','jay','sarah','izzy','w_guitar','w_pillow','w_ball','w_blower','w_call','w_hug','w_rainbow','w_wave','y_puppies','w_splash','d_gravy','w_sign','w_megaphone','w_frame','w_paint','w_palette'];
 const AN = window.ANIM || {};
 const IMG = {};
 const WHITE = {}; // white silhouettes for hit flashes
@@ -43,9 +44,9 @@ function whiteOf(name) {
 
 // ---------- data ----------
 const CHARS = {
-  grandpa:   { name:'Jan',          role:'The Gravy Baron', hp:130, speed:245, perk:'Gravy Gun hits 40% harder and splashes more slick puddles.', gravyMul:1.4, puddleMul:2 },
-  grandma:   { name:'Grandma',      role:'Pie Commander',   hp:120, speed:250, perk:'Starts with a stack of Pie Frisbees. Pie slices heal double.', startPie:20, healMul:2 },
-  teen:      { name:'Eli',          role:'Junkyard Inventor', hp:100, speed:265, perk:'Picks up junk scraps. Collect 5 and he builds a Mac & Cheese Blaster that traps enemies in sticky cheese webs for 10s!', rateMul:0.85, startCorn:250, special:'scrap' },
+  grandpa:   { name:'Jan',          role:'Poet & Painter',  hp:130, speed:245, perk:'Gravy Gun hits 40% harder. SPECIAL: flings a paint splash that freezes enemies into framed masterpieces. Hit them to shatter the art!', gravyMul:1.4, puddleMul:2, special:'paint' },
+  grandma:   { name:'Paula',        role:'Protest Leader',  hp:120, speed:250, perk:'Starts with Pie Frisbees and pie heals double. SPECIAL: grabs her megaphone and nearby enemies drop everything to march in her picket line!', startPie:20, healMul:2, special:'protest' },
+  teen:      { name:'Eli',          role:'Junkyard Inventor', hp:100, speed:265, perk:'Picks up junk scraps. Collect 3 and he builds a Mac & Cheese Blaster that traps enemies in sticky cheese webs for 10s!', rateMul:0.85, startCorn:250, special:'scrap' },
   kidred:    { name:'Issac',        role:'Human Cannonball', hp:85,  speed:315, perk:'Super speedy. SPECIAL: winds up, then charges like crazy, smashing through enemy after enemy!', dashCd:0.45, special:'charge' },
   kidstripe: { name:'Benny',        role:'Trash Talker',    hp:90,  speed:290, perk:'Bigger Stuffing Bombs and a big mouth. SPECIAL: hurls insults so mean they hurt, and enemies run away crying!', bombs:6, bombMul:1.5, special:'taunt' },
   mama:      { name:'Raquel',       role:'Caffeine Queen',  hp:105, speed:280, perk:'SPECIAL: hurls fizzing energy drink cans. Anything splashed goes bonkers and attacks the other enemies!', special:'can' },
@@ -53,7 +54,19 @@ const CHARS = {
   michelle:  { name:'Michelle',       role:'Slime Slinger', hp:100, speed:275, perk:'SPECIAL: lobs balls of acid slime that melt enemies into gooey, harmless puddles of themselves!', special:'slime' },
   arthur:    { name:'Arthur',       role:'Hot Mouth',       hp:115, speed:265, perk:'SPECIAL: pops a chili pepper and breathes a roaring blast of fire for 5 seconds!', special:'chili' },
 };
-const CHAR_ORDER = ['grandpa','grandma','pops','mama','michelle','arthur','teen','kidred','kidstripe'];
+Object.assign(CHARS, {
+  david:   { name:'David',   role:'Groovy Guitar Guy', hp:125, speed:250, perk:'SPECIAL: strums his guitar and nearby enemies start a hippie dance party, hugging each other instead of fighting!', special:'guitar' },
+  peter:   { name:'Peter',   role:'Napmaster General', hp:120, speed:245, perk:'SPECIAL: one huge yawn puts every enemy nearby to sleep. Sleeping enemies take extra damage!', special:'nap' },
+  eric:    { name:'Eric',    role:'Belly Flop Champ',  hp:135, speed:255, perk:'SPECIAL: a running belly flop that slides on gravy, bowling enemies over and sending out a gravy wave!', special:'flop' },
+  robyn:   { name:'Robyn',   role:'Leaf Blower Queen', hp:110, speed:270, perk:'SPECIAL: fires up the leaf blower and blasts enemies (and their shots) clear across the yard!', special:'blower' },
+  madison: { name:'Madison', role:'Soccer Star',       hp:95,  speed:300, perk:'SPECIAL: kicks a soccer ball that ricochets from enemy to enemy!', special:'ball' },
+  taylor:  { name:'Taylor',  role:'Goalie',            hp:100, speed:290, perk:'SPECIAL: a goalie shield that bounces enemy shots back and protects teammates inside it!', special:'goalie' },
+  zoe:     { name:'Zoe',     role:'Puppy Wrangler',    hp:95,  speed:295, perk:'SPECIAL: tosses out puppies that zoom around, and enemies chase them instead of you!', special:'puppy' },
+  jay:     { name:'Jay',     role:'El Luchador',       hp:120, speed:260, perk:'SPECIAL: transforms into a masked luchador, grabs the closest enemy, swings them around smashing everyone, then flings them into the crowd!', special:'luchador' },
+  sarah:   { name:'Sarah',   role:'Hug Healer',        hp:115, speed:265, perk:'SPECIAL: a big group hug that heals everyone nearby and even gets fallen teammates back up!', special:'hug' },
+  izzy:    { name:'Izzy',    role:'Rainbow Blaster',   hp:90,  speed:300, perk:'SPECIAL: fires a rainbow laser that makes enemies explode into confetti and flowers!', special:'rainbow' },
+});
+const CHAR_ORDER = ['grandma','pops','mama','michelle','arthur','teen','kidred','kidstripe','david','peter','eric','robyn','madison','taylor','zoe','jay','sarah','izzy','grandpa'];
 
 const WEAPONS = {
   gravy: { name:'Gravy Gun',            img:'w_gravy', rate:0.15, dmg:12, speed:720, spread:0.05, count:1, r:9,  life:1.2, color:'#8a5523', hi:'#c58a4a', ammo:Infinity },
@@ -82,7 +95,10 @@ const ENEMIES = {
 };
 
 const ARENA = { w: 2400, h: 1600 };
-const ROAST_CD = 4.5, CAN_CD = 5, STOMP_CD = 6, SLIME_CD = 5, CHILI_CD = 10;
+// every special's cooldown is scaled by this (0.6 = 40% faster than the original tuning)
+const CD_MUL = 0.6;
+const SCRAPS_NEEDED = 3; // junk scraps Eli needs to build the Mac & Cheese Blaster
+const ROAST_CD = 4.5 * CD_MUL, CAN_CD = 5 * CD_MUL, STOMP_CD = 6 * CD_MUL, SLIME_CD = 5 * CD_MUL, CHILI_CD = 10 * CD_MUL, CHARGE_CD = 6 * CD_MUL;
 
 // Benny's trash talk: rude, but kid-friendly
 const TAUNTS = {
@@ -214,6 +230,15 @@ const Sfx = (() => {
     heal() { [523, 659, 784, 1046].forEach((f, i) => tone({ f, type: 'triangle', dur: 0.12, vol: 0.12, delay: i * 0.07 })); },
     dash() { burst({ dur: 0.18, vol: 0.2, freq: 3000, type: 'bandpass', q: 0.7 }); },
     wave() { [392, 523, 659, 784].forEach((f, i) => tone({ f, type: 'square', dur: 0.15, vol: 0.09, delay: i * 0.1 })); },
+    strum() { [196, 247, 294, 392, 494].forEach((f, i) => { tone({ f, type: 'triangle', dur: 0.9, vol: 0.09, delay: i * 0.035 }); tone({ f: f * 2, type: 'sine', dur: 0.6, vol: 0.03, delay: i * 0.035 }); }); },
+    yawn() { tone({ f: 260, f2: 520, type: 'sine', dur: 0.35, vol: 0.12 }); tone({ f: 520, f2: 140, type: 'sine', dur: 0.6, vol: 0.12, delay: 0.35 }); },
+    wind() { if (throttle('wind', 250)) return; burst({ dur: 0.5, vol: 0.18, freq: 1400, type: 'bandpass', q: 0.5 }); tone({ f: 90, f2: 110, type: 'sawtooth', dur: 0.5, vol: 0.04 }); },
+    kick() { if (throttle('kick', 80)) return; tone({ f: 160, f2: 60, type: 'sine', dur: 0.12, vol: 0.25 }); burst({ dur: 0.05, vol: 0.12, freq: 1200 }); },
+    shield() { tone({ f: 300, f2: 1200, type: 'sine', dur: 0.35, vol: 0.12 }); tone({ f: 600, f2: 1800, type: 'triangle', dur: 0.35, vol: 0.05 }); },
+    bark() { if (throttle('bark', 160)) return; tone({ f: rand(500, 700), f2: rand(250, 350), type: 'square', dur: 0.07, vol: 0.08 }); tone({ f: rand(500, 700), f2: 300, type: 'square', dur: 0.07, vol: 0.07, delay: 0.12 }); },
+    call() { [0, 1, 2, 3, 4].forEach(i => tone({ f: 700 + (i % 2) * 300, f2: 500, type: 'sawtooth', dur: 0.08, vol: 0.07, delay: i * 0.09 })); },
+    megaphone() { burst({ dur: 0.08, vol: 0.12, freq: 3000, type: 'highpass' }); [0, 1, 2].forEach(i => tone({ f: 330 + i * 40, f2: 300, type: 'square', dur: 0.14, vol: 0.07, delay: 0.08 + i * 0.15 })); },
+    beam() { tone({ f: 400, f2: 1600, type: 'sawtooth', dur: 0.4, vol: 0.07 }); [523, 659, 784, 988, 1175].forEach((f, i) => tone({ f, type: 'sine', dur: 0.15, vol: 0.06, delay: i * 0.05 })); },
     over() { [392, 330, 262, 196].forEach((f, i) => tone({ f, type: 'triangle', dur: 0.3, vol: 0.15, delay: i * 0.22 })); },
   };
 })();
@@ -319,7 +344,7 @@ let fireHeld = false, fireTouch = null;
 
 // ---------- game state ----------
 let state = 'title';
-let selected = store.get('tg_char', 'grandpa');
+let selected = store.get('tg_char', 'pops'); // first-time default: Steve
 const names = Object.fromEntries(CHAR_ORDER.map(k => [k, CHARS[k].name])); // fixed names (renaming was removed)
 let tableT = 8, corpses = [], webs = [], roasts = [], cans = [], acids = [], flames = [];
 // player = the player currently being simulated/drawn (the "actor"); me = this device's player; players = everyone
@@ -343,7 +368,7 @@ function makePlayer(ch, id, pname, idx, n) {
     // animation / body dynamics
     dir: 'front', flipX: false, dirHold: 0, stride: 0, frame: 1, lastFrame: 1, bodyAng: Math.PI / 2,
     lastFire: 9, lean: 0, leanV: 0, sq: 0, sqV: 0, hurtT: 0, victoryT: 0, dead: false, deadT: 0, gunAng: Math.PI / 2,
-    scraps: 0, macT: 0, prevWeapon: 'gravy', chargeCd: 0, chargeWind: 0, chargeT: 0, chargeDir: [1, 0], chargeTarget: null, lastTaunt: -9, speech: null, roastCd: 0, roastFlash: 0, canCd: 0, stompCd: 0, stompWind: 0, jumpT: 0, slimeCd: 0, chiliCd: 0, chewT: 0, breathT: 0,
+    scraps: 0, macT: 0, prevWeapon: 'gravy', chargeCd: 0, chargeWind: 0, chargeT: 0, chargeDir: [1, 0], chargeTarget: null, lastTaunt: -9, speech: null, roastCd: 0, roastFlash: 0, canCd: 0, stompCd: 0, stompWind: 0, jumpT: 0, slimeCd: 0, chiliCd: 0, chewT: 0, breathT: 0, spCd: 0, spT: 0, spA: 0,
   };
 }
 // roster: [{ id, name, ch }] (single player: just this device)
@@ -353,7 +378,7 @@ function newGame(roster, myId) {
   me = players.find(p => p.id === (myId || 'me')) || players[0];
   player = me;
   nextId = 1;
-  enemies = []; bullets = []; ebullets = []; bombs = []; particles = []; puddles = []; pickups = []; floaters = []; corpses = []; webs = []; roasts = []; cans = []; acids = []; flames = []; fireParts = []; smokeParts = []; tableT = 8;
+  enemies = []; bullets = []; ebullets = []; bombs = []; particles = []; puddles = []; pickups = []; floaters = []; corpses = []; webs = []; roasts = []; cans = []; acids = []; flames = []; fireParts = []; smokeParts = []; gizmos = []; tableT = 8;
   initYard();
   spawnQueue = []; wave = Math.max(0, (testLevel || parseInt(new URLSearchParams(location.search).get('wave')) || 1) - 1); score = 0; kills = 0; shake = 0; time = 0; banner = null; boss = null; hitStop = 0;
   props = makeProps();
@@ -870,6 +895,527 @@ function drawSmokePuff(s) {
   ctx.translate(s.x, s.y - s.z); ctx.rotate(s.rot); ctx.drawImage(fireSpr.smoke, -sz, -sz, sz * 2, sz * 2); ctx.restore();
 }
 
+// ======================================================================================
+// ---------- the family powers (David, Peter, Eric, Robyn, Madison, Taylor, Zoe, Jay, Sarah, Izzy) ----------
+// Each uses a shared cooldown (p.spCd) and active timer (p.spT). Things they leave in the world
+// (soccer ball, puppies, brawl cloud, gravy wave, hearts) live in `gizmos` so they sync to other players.
+// ======================================================================================
+const SP = {
+  guitar:  { label: 'STRUM', cd: 9,  dur: 0.9, color: '#8a4fd6', glow: 'rgba(190,140,255,.55)', held: 'w_guitar', busy: true, shouts: ['Peace, love and gravy!', 'Feel the groove, man!', 'Group hug, dudes!', 'Make love, not war!'] },
+  nap:     { label: 'YAWN',  cd: 10, dur: 0.8, color: '#4a6fb0', glow: 'rgba(140,180,255,.55)', busy: true, shouts: ['*YAAAWN* Nap time...', "Shhh. Grandpa's resting.", 'Five more minutes...', 'Sleepy time, turkeys.'] },
+  flop:    { label: 'FLOP',  cd: 7,  dur: 0.7, color: '#8a5a2a', glow: 'rgba(200,140,80,.55)', busy: true, shouts: ['CANNONBALL!', 'Belly flop!', 'Look out below!', 'Gravy slide!'] },
+  blower:  { label: 'BLOW',  cd: 8,  dur: 2.5, color: '#e8742a', glow: 'rgba(255,170,80,.55)', held: 'w_blower', busy: true, slow: 0.55, shouts: ['Leaf it to me!', 'Gone with the wind!', 'Get off my lawn!', 'Blow-out sale!'] },
+  ball:    { label: 'KICK',  cd: 6,  dur: 0.3, color: '#3a3a3a', glow: 'rgba(255,255,255,.5)', busy: true, shouts: ['GOOOAL!', 'Header!', 'Bend it!', 'Top corner!'] },
+  goalie:  { label: 'BLOCK', cd: 12, dur: 4,   color: '#1fa3a3', glow: 'rgba(90,230,230,.5)', shouts: ['Not in my net!', 'Blocked!', 'Nothing gets past me!', 'Save!'] },
+  puppy:   { label: 'PUPS',  cd: 11, dur: 0.4, color: '#c46aa8', glow: 'rgba(255,170,220,.55)', busy: true, shouts: ["Go get 'em, puppies!", 'Fetch!', "Who's a good boy?!", 'Puppy pile!'] },
+  call:    { label: 'CALL',  cd: 10, dur: 0.6, color: '#7a5230', glow: 'rgba(200,150,90,.55)', held: 'w_call', busy: true, shouts: ['Gobble gobble, fools!', 'Here, turkey turkey!', 'Fight fight fight!', 'Dinner bell!'] },
+  hug:     { label: 'HUG',   cd: 14, dur: 0.6, color: '#e04a8a', glow: 'rgba(255,140,190,.55)', busy: true, shouts: ['Bring it in, everybody!', 'Group hug!', 'Love you guys!', 'Hugs heal!'] },
+  protest: { label: 'RALLY', cd: 11, dur: 0.9, color: '#c0392b', glow: 'rgba(255,120,100,.55)', held: 'w_megaphone', busy: true, shouts: ['What do we want?!', 'Everybody, signs UP!', 'Hey hey, ho ho!', 'Power to the pie!', 'Join the movement!'] },
+  paint:   { label: 'ART',   cd: 9,  dur: 0.5, color: '#2f6fd6', glow: 'rgba(120,170,255,.55)', held: 'w_palette', busy: true, shouts: ['Behold... ART!', 'A masterpiece!', 'Hold still, darling.', 'Ode to a turkey...', 'Gravy is my medium!', 'I call this one "Dinner".'] },
+  luchador:{ label: 'LUCHA', cd: 10, dur: 2.3, color: '#2f9e44', glow: 'rgba(120,230,140,.55)', busy: true, slow: 0.45, shouts: ['¡LUCHA LIBRE!', '¡EL PAVO LOCO!', 'Feel the MUSCLES!', '¡VÁMONOS!', 'Spin cycle!'] },
+  rainbow: { label: 'LOVE',  cd: 10, dur: 2.5, color: '#d63ad6', glow: 'rgba(255,140,255,.5)', icon: 'w_rainbow', busy: true, slow: 0.5, shouts: ['RAINBOW POWER!', 'Taste the rainbow!', 'Sparkle time!', 'Pew pew pew!'] },
+};
+let gizmos = [];
+const inRange = (e, x, y, r) => !e.dead && e.spawnT <= 0 && (e.x - x) ** 2 + (e.y - y) ** 2 < r * r;
+const aimDir = p => [Math.cos(p.aim), Math.sin(p.aim)];
+
+function startSpecial(p) {
+  const kind = CHARS[p.ch].special, S = SP[kind];
+  p.spT = S.dur; p.spCd = S.cd * CD_MUL; p.spA = p.aim;
+  p.speech = { text: pick(S.shouts), t: 1.5, max: 1.5 };
+  const [dx, dy] = aimDir(p);
+  if (kind === 'guitar') {
+    Sfx.strum();
+    // three rippling waves of good vibes roll out from the guitar
+    for (let i = 0; i < 3; i++) gizmos.push({ id: nextId++, kind: 'vibes', x: p.x, y: p.y, z: 0, vx: 0, vy: 0, vz: 0, a: 0, r: 0, life: 1.3 + i * 0.3, max: 1.3, f: i * 0.3, hits: new Set() });
+  } else if (kind === 'nap') {
+    Sfx.yawn();
+  } else if (kind === 'flop') {
+    p.flopDir = [dx, dy]; p.inv = Math.max(p.inv, S.dur + 0.15); p.sq = 0.3; p.sqV = 0; p.flopHit = new Set();
+    Sfx.dash();
+  } else if (kind === 'blower') {
+    Sfx.wind();
+  } else if (kind === 'ball') {
+    gizmos.push({ id: nextId++, kind: 'ball', x: p.x + dx * 30, y: p.y + dy * 20, z: 20, vx: dx * 720, vy: dy * 720, vz: 0, a: 0, r: 16, life: 3.5, max: 3.5, f: 0, hits: new Set(), bounces: 0, oid: p.id });
+    Sfx.kick();
+  } else if (kind === 'goalie') {
+    Sfx.shield();
+  } else if (kind === 'puppy') {
+    for (let i = 0; i < 3; i++) {
+      const a = p.aim + (i - 1) * 0.45, d = rand(140, 220);
+      gizmos.push({ id: nextId++, kind: 'pup', x: p.x, y: p.y, z: 30, vx: Math.cos(a) * d / 0.5, vy: Math.sin(a) * d / 0.5, vz: 260, a: a, r: 18, life: 6.5, max: 6.5, f: randi(0, 3), tx: 0, ty: 0, wt: 0, hop: 0 });
+    }
+    Sfx.bark();
+  } else if (kind === 'call') {
+    const sx = clamp(p.x + dx * 220, 100, ARENA.w - 100), sy = clamp(p.y + dy * 160, 120, ARENA.h - 80);
+    gizmos.push({ id: nextId++, kind: 'brawl', x: sx, y: sy, z: 0, vx: 0, vy: 0, a: 0, r: 70, life: 3.8, max: 3.8, f: 0 });
+    for (const e of enemies) if (inRange(e, sx, sy, 520) && !e.d.boss) { e.brawlT = 3.6; e.brawlX = sx; e.brawlY = sy; e.st = 'move'; e.hypeT = 0; e.danceT = 0; }
+    Sfx.call();
+  } else if (kind === 'hug') {
+    let healed = 0;
+    for (const q of players) {
+      if ((q.x - p.x) ** 2 + (q.y - p.y) ** 2 > 260 ** 2) continue;
+      if (q.dead) { q.dead = false; q.hp = Math.round(q.maxHp * 0.4); q.vz = 0; q.z = 0; floatText(q.x, q.y - 120, `${q.pname || names[q.ch]} is back!`, '#ff8ac0', 1.8, 22); }
+      else { const h = Math.round(q.maxHp * 0.35); q.hp = Math.min(q.maxHp, q.hp + h); floatText(q.x, q.y - 110, `+${h} HP`, '#7dff8a', 1.1, 22); }
+      q.inv = Math.max(q.inv, 1); healed++;
+    }
+    gizmos.push({ id: nextId++, kind: 'hearts', x: p.x, y: p.y, z: 0, vx: 0, vy: 0, a: 0, r: 260, life: 0.9, max: 0.9, f: 0 });
+    Sfx.heal();
+  } else if (kind === 'rainbow') {
+    Sfx.beam();
+  } else if (kind === 'luchador') {
+    // a puff of smoke and he's a luchador! grab whoever is closest
+    dustBurst(p.x, p.y, 18, 1.6); shake = Math.max(shake, 8); Sfx.windup();
+    floatText(p.x, p.y - p.h - 40, '¡LUCHA!', '#ffe14d', 1.2, 30);
+    let best = null, bd = 300 ** 2;
+    for (const e of enemies) { if (e.dead || e.spawnT > 0) continue; const dd = (e.x - p.x) ** 2 + (e.y - p.y) ** 2; if (dd < bd) { bd = dd; best = e; } }
+    p.grabId = 0; p.thrown = false; p.spinA = p.aim;
+    if (best && best.d.boss) { damageEnemy(best, 70 + wave * 6, Math.cos(p.aim), Math.sin(p.aim), 700); floatText(best.x, best.y - best.h - 30, 'BODY SLAM!', '#ffe14d', 1, 28); }
+    else if (best) { p.grabId = best.id; best.held = true; best.st = 'move'; best.hypeT = 0; best.paintT = 0; best.pickT = 0; best.danceT = 0; best.sleepT = 0; p.spinA = Math.atan2(best.y - p.y, best.x - p.x); }
+  } else if (kind === 'paint') {
+    // a big wet splat of paint flies out and freezes whoever it hits into a work of art
+    gizmos.push({ id: nextId++, kind: 'paint', x: p.x + dx * 30, y: p.y + dy * 20, z: 46, vx: dx * 620, vy: dy * 620, vz: 0, a: 0, r: 40, life: 0.65, max: 0.65, f: rand(0, 6), hits: new Set() });
+    Sfx.throw(); Sfx.splat();
+  } else if (kind === 'protest') {
+    // everyone nearby joins a picket line a little way in front of her
+    Sfx.megaphone();
+    const lx = clamp(p.x + dx * 170, 160, ARENA.w - 160), ly = clamp(p.y + dy * 120, 160, ARENA.h - 90);
+    const recruits = enemies.filter(e => inRange(e, p.x, p.y, 360) && !e.d.boss).sort((a, b) => a.x - b.x);
+    recruits.forEach((e, i) => { const n = recruits.length; e.pickT = 5.5; e.pickX = lx + (i - (n - 1) / 2) * 84; e.pickY = ly + (i % 2) * 16; e.signI = randi(0, SIGNS.length - 1); e.st = 'move'; e.hypeT = 0; e.danceT = 0; e.brawlT = 0; });
+    for (const e of enemies) if (e.d.boss && inRange(e, p.x, p.y, 360)) { e.pickT = 1.5; e.pickX = e.x; e.pickY = e.y; e.signI = randi(0, SIGNS.length - 1); }
+    if (recruits.length) gizmos.push({ id: nextId++, kind: 'picket', x: lx, y: ly, z: 0, vx: 0, vy: 0, vz: 0, a: 0, r: recruits.length * 42 + 40, life: 5.5, max: 5.5, f: 0 });
+  }
+}
+const ART_NAMES = { turkey: 'Turkey', potato: 'Potato', tot: 'Tater Tot', cranberry: 'Cranberry', corn: 'Corn', pumpkin: 'Pumpkin' };
+const ART_TITLES = ['Still Life', 'in Blue', 'at Dusk', 'No. 5', 'Nocturne', 'Study in Gravy', 'Interrupted', 'with Pearl Earring', 'Screaming', 'Abstract', 'Melancholy', 'Before Dinner'];
+const PAINTS = ['#e8312a', '#2f7fe8', '#ffd21f', '#3cc24a', '#9b4fe0', '#ff8a1f'];
+function artLabel(e) { const nm = e.d.boss ? e.d.bname.replace(/^THE /, '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : ART_NAMES[e.type] || 'Untitled'; return `${nm}, ${ART_TITLES[(e.artI || 0) % ART_TITLES.length]} (2026)`; }
+// shattered art: canvas shards and paint flying everywhere
+function artShatter(x, y, h) {
+  for (let i = 0; i < 26; i++) particles.push({ x, y, z: h * 0.5, vx: rand(-240, 240), vy: rand(-170, 170), vz: rand(150, 420), life: rand(0.8, 1.4), max: 1.4, color: pick(PAINTS.concat(['#f3e7c9', '#d9b44a'])), size: rand(5, 9), grav: 800, confetti: true, rot: rand(0, 6) });
+  floatText(x, y - h - 20, pick(['CRASH!', 'SHATTER!', 'Art is dead!', 'Critics hated it!']), '#ffe14d', 0.8, 22);
+}
+const SIGNS = ['NO MORE GRAVY!', 'TURKEYS UNITE!', 'SAVE THE YAMS', 'STRIKE!', 'FAIR WAGES 4 POTATOES', 'HONK IF U HATE PIE', 'NOT YOUR DINNER', 'CRANBERRY RIGHTS', 'DOWN WITH FORKS', 'WE WANT NAPS', 'CORN IS PEOPLE TOO', 'STUFF THIS!'];
+const CHANTS = ['What do we want?!', 'NO GRAVY!', 'When do we want it?!', 'NOW!', 'Hey hey! Ho ho!', 'This feast has got to go!', 'STRIKE! STRIKE!'];
+
+// runs every frame while a power is active (p.spT > 0)
+function tickSpecial(p, dt) {
+  const kind = CHARS[p.ch].special, S = SP[kind];
+  p.spT -= dt;
+  const [dx, dy] = aimDir(p);
+  if (kind === 'nap' && p.spT <= 0) {
+    // the yawn lands: everyone nearby nods off
+    for (const e of enemies) if (inRange(e, p.x, p.y, 360)) { e.sleepT = e.d.boss ? 1.4 : 4; e.st = 'move'; e.hypeT = 0; e.danceT = 0; }
+    for (let i = 0; i < 6; i++) particles.push({ x: p.x + rand(-30, 30), y: p.y, z: p.h, vx: rand(-60, 60), vy: rand(-20, 20), vz: rand(40, 90), life: 1.2, max: 1.2, color: '#bcd6ff', size: rand(5, 9), grav: -20, smoke: true });
+  } else if (kind === 'flop') {
+    const sp = p.speed * 2.7;
+    p.vx = p.flopDir[0] * sp; p.vy = p.flopDir[1] * sp;
+    if (Math.random() < dt * 11) puddles.push({ x: p.x + rand(-10, 10), y: p.y + rand(-6, 6), r: rand(28, 38), life: 4, max: 4, seed: Math.random() * 10 });
+    for (const e of enemies) {
+      if (p.flopHit.has(e) || !inRange(e, p.x, p.y, e.r + p.r + 20)) continue;
+      p.flopHit.add(e); damageEnemy(e, 35 + wave * 3, p.flopDir[0], p.flopDir[1], 560);
+      floatText(e.x, e.y - e.h - 20, pick(POW), '#ffec3d', 0.7, 24); shake = Math.max(shake, 6);
+    }
+    if (p.spT <= 0) {
+      p.vx *= 0.2; p.vy *= 0.2; p.sq = 0.35; p.sqV = 0; Sfx.splat(); shake = Math.max(shake, 10);
+      // r carries the wave's heading
+      gizmos.push({ id: nextId++, kind: 'gwave', x: p.x + p.flopDir[0] * 30, y: p.y + p.flopDir[1] * 20, z: 0, vx: 0, vy: 0, a: 0, r: Math.atan2(p.flopDir[1], p.flopDir[0]), life: 1.45, max: 1.45, f: 0, hits: new Set() });
+    }
+  } else if (kind === 'blower') {
+    // a 70-degree cone of wind: shoves enemies, scatters their shots, blows the leaves around
+    const R = 400, cosHalf = Math.cos(0.62);
+    const inCone = (x, y) => { const ox = x - p.x, oy = y - p.y, d = Math.hypot(ox, oy); return d < R && d > 1 && (ox * dx + oy * dy) / d > cosHalf ? d : 0; };
+    for (const e of enemies) {
+      if (e.dead || e.spawnT > 0) continue;
+      const d = inCone(e.x, e.y); if (!d) continue;
+      const k = (1 - d / R) * 0.6 + 0.4;
+      e.vx += dx * 2400 * k * dt / e.mass; e.vy += dy * 2400 * k * dt / e.mass; e.hurtT = Math.max(e.hurtT, 0.1);
+      e.blowDmg = (e.blowDmg || 0) + dt * (8 + wave * 0.8);
+      if (e.blowDmg >= 4) { const dmg = Math.floor(e.blowDmg); e.blowDmg -= dmg; damageEnemy(e, dmg, 0, 0, 0); e.flash = 0; }
+    }
+    for (const b of ebullets) if (inCone(b.x, b.y)) b.life = 0;
+    for (const l of leaves) if (inCone(l.x, l.y)) { l.rest = false; l.vx += dx * 900 * dt * 3; l.vy += dy * 600 * dt * 3; l.vz = Math.max(l.vz || 0, rand(60, 160)); l.vrot = rand(-12, 12); }
+    if (Math.random() < dt * 6) Sfx.wind();
+  } else if (kind === 'goalie') {
+    const R = 100;
+    for (const b of ebullets) {
+      const ox = b.x - p.x, oy = b.y - p.y, d = Math.hypot(ox, oy);
+      if (d < R && b.life > 0) { // SAVE! the shot flies back out as ours
+        b.life = 0;
+        const sp = Math.hypot(b.vx, b.vy) * 1.3 || 500, a = Math.atan2(oy, ox);
+        p.saveT = time + 0.3; floatText(b.x, b.y - 60, pick(['SAVE!', 'BLOCKED!', 'NOPE!']), '#ffffff', 0.6, 20);
+        bullets.push({ id: nextId++, owner: p, w: 'gravy', x: b.x, y: b.y, z: 40, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 10, dmg: 18 + wave * 2, life: 1.2, max: 1.2, hits: new Set(), rot: 0 });
+        Sfx.thump();
+      }
+    }
+    for (const e of enemies) {
+      if (e.dead || e.spawnT > 0 || e.d.boss) continue;
+      const ox = e.x - p.x, oy = e.y - p.y, d = Math.hypot(ox, oy) || 1;
+      if (d < R + e.r) { e.vx += ox / d * 900 * dt * 4; e.vy += oy / d * 900 * dt * 4; }
+    }
+    for (const q of players) if (!q.dead && (q.x - p.x) ** 2 + (q.y - p.y) ** 2 < R * R) q.inv = Math.max(q.inv, 0.15);
+  } else if (kind === 'rainbow') {
+    // a long rainbow beam: anything on it takes a beating and is marked to burst into confetti
+    const L = 680, W = 20, ox = p.x + dx * 14, oy = p.y - p.h * 0.52 + dy * 8; // from her heart
+    for (const e of enemies) {
+      if (e.dead || e.spawnT > 0) continue;
+      const rx = e.x - ox, ry = (e.y - e.h * 0.4) - oy, t = rx * dx + ry * dy;
+      if (t < 0 || t > L) continue;
+      if (Math.abs(rx * dy - ry * dx) > W + e.r * 0.8) continue;
+      e.rainbowT = 0.6;
+      e.beamDmg = (e.beamDmg || 0) + dt * (60 + wave * 5) * (e.d.boss ? 0.6 : 1);
+      if (e.beamDmg >= 5) { const dmg = Math.floor(e.beamDmg); e.beamDmg -= dmg; damageEnemy(e, dmg, dx, dy, 30); }
+    }
+    if (Math.random() < dt * 30) particles.push({ x: ox + dx * rand(40, L), y: oy + p.h * 0.52 + dy * rand(40, L), z: p.h * 0.52, vx: rand(-40, 40), vy: rand(-40, 40), vz: rand(30, 90), life: 0.5, max: 0.5, color: pick(RAINBOW), size: rand(3, 6), grav: 200 });
+  }
+  if (kind === 'luchador') {
+    const age = S.dur - p.spT, e = p.grabId ? enemies.find(x => x.id === p.grabId && !x.dead) : null;
+    if (e && e.held) {
+      if (age < 0.25) { // yank them in
+        p.spinA = Math.atan2(e.y - p.y, e.x - p.x);
+        e.x = lerp(e.x, p.x + Math.cos(p.spinA) * 72, 0.35); e.y = lerp(e.y, p.y + Math.sin(p.spinA) * 44, 0.35); e.z = 20;
+      } else if (age < 1.85) { // the airplane spin: whatever they smash into gets wrecked
+        p.spinA += dt * 11;
+        e.x = p.x + Math.cos(p.spinA) * 74; e.y = p.y + Math.sin(p.spinA) * 46; e.z = 34;
+        if (Math.random() < dt * 20) dustBurst(p.x + rand(-20, 20), p.y, 1, 0.8);
+        for (const o of enemies) {
+          if (o === e || o.dead || o.spawnT > 0 || (o.smashCd || 0) > time) continue;
+          const ox = o.x - e.x, oy = o.y - e.y, od = Math.hypot(ox, oy);
+          if (od > o.r + e.r + 12) continue;
+          o.smashCd = time + 0.45;
+          damageEnemy(o, 30 + wave * 3, ox / (od || 1), oy / (od || 1), 560); damageEnemy(e, 6 + wave, 0, 0, 0);
+          floatText(o.x, o.y - o.h - 20, pick(POW), '#ffec3d', 0.6, 24); shake = Math.max(shake, 6);
+        }
+      } else if (!p.thrown) { // and LET GO
+        p.thrown = true; e.held = false;
+        const tx = -Math.sin(p.spinA), ty = Math.cos(p.spinA); // along the spin
+        e.thrownT = 0.9; e.vx = tx * 980; e.vy = ty * 720; e.vz = 260; e.throwHits = new Set();
+        floatText(e.x, e.y - e.h - 30, pick(['YEET!', '¡ADIÓS!', 'SUPLEX!', 'FLYING TURKEY!']), '#ffe14d', 0.9, 26); Sfx.throw(); shake = Math.max(shake, 10);
+      }
+    } else if (age > 0.25 && !p.thrown) p.thrown = true;
+    if (p.spT <= 0) { if (e && e.held) e.held = false; dustBurst(p.x, p.y, 12, 1.3); }
+  }
+  if (kind === 'guitar' && Math.random() < dt * 10) particles.push({ x: p.x + rand(-20, 20), y: p.y, z: p.h * 0.8, vx: rand(-40, 40), vy: rand(-10, 10), vz: rand(60, 120), life: 1, max: 1, note: true, color: pick(['#ffd84a', '#ff8ac0', '#8affc0']), size: 14, grav: -10 });
+}
+const RAINBOW = ['#ff3b3b', '#ff9a2a', '#ffe14d', '#4fdc5a', '#3aa0ff', '#8a5aff'];
+
+function updateGizmos(dt) {
+  for (const g of gizmos) {
+    g.life -= dt; g.a += dt;
+    if (g.kind === 'ball') {
+      g.vz -= 900 * dt; g.z += g.vz * dt; if (g.z <= 0) { g.z = 0; g.vz = Math.abs(g.vz) > 80 ? -g.vz * 0.5 : 0; }
+      g.x += g.vx * dt; g.y += g.vy * dt; g.f += Math.hypot(g.vx, g.vy) * dt * 0.05;
+      if (g.x < 30 || g.x > ARENA.w - 30) { g.vx *= -1; g.x = clamp(g.x, 30, ARENA.w - 30); }
+      if (g.y < 50 || g.y > ARENA.h - 30) { g.vy *= -1; g.y = clamp(g.y, 50, ARENA.h - 30); }
+      for (const e of enemies) {
+        if (g.hits.has(e) || !inRange(e, g.x, g.y, e.r + g.r)) continue;
+        g.hits.add(e); g.bounces++;
+        const sp = Math.hypot(g.vx, g.vy) || 1;
+        damageEnemy(e, 40 + wave * 3, g.vx / sp, g.vy / sp, 380);
+        floatText(e.x, e.y - e.h - 20, pick(['GOAL!', 'BONK!', 'NUTMEG!', 'SCORE!']), '#ffffff', 0.7, 22); Sfx.kick();
+        // ricochet to the next closest enemy it hasn't hit yet
+        let nxt = null, bd = 480 ** 2;
+        for (const o of enemies) { if (o.dead || o.spawnT > 0 || g.hits.has(o)) continue; const dd = (o.x - g.x) ** 2 + (o.y - g.y) ** 2; if (dd < bd) { bd = dd; nxt = o; } }
+        if (nxt && g.bounces < 8) { const a = Math.atan2(nxt.y - g.y, nxt.x - g.x); g.vx = Math.cos(a) * 760; g.vy = Math.sin(a) * 760; g.vz = 160; g.life = Math.max(g.life, 1.2); }
+        else { g.vx *= -0.5; g.vy *= -0.5; g.vz = 220; g.life = Math.min(g.life, 1.2); }
+        break;
+      }
+      g.vx *= Math.exp(-dt * 0.4); g.vy *= Math.exp(-dt * 0.4);
+    } else if (g.kind === 'pup') {
+      if (g.z > 0 || g.vz > 0) { g.vz -= 900 * dt; g.z = Math.max(0, g.z + g.vz * dt); g.x += g.vx * dt; g.y += g.vy * dt; if (g.z === 0) { g.vz = 0; g.vx = 0; g.vy = 0; } }
+      else {
+        // run around the yard; dodge away from anything getting close
+        g.wt -= dt;
+        let threat = null, td = 70 ** 2;
+        for (const e of enemies) { if (e.dead || e.spawnT > 0) continue; const dd = (e.x - g.x) ** 2 + (e.y - g.y) ** 2; if (dd < td) { td = dd; threat = e; } }
+        if (threat) { const a = Math.atan2(g.y - threat.y, g.x - threat.x) + rand(-0.6, 0.6); g.tx = g.x + Math.cos(a) * 260; g.ty = g.y + Math.sin(a) * 200; g.wt = 1.2; g.hop = 0.25; if (Math.random() < 0.3) Sfx.bark(); }
+        else if (g.wt <= 0) { const a = rand(0, Math.PI * 2); g.tx = g.x + Math.cos(a) * rand(120, 280); g.ty = g.y + Math.sin(a) * rand(90, 200); g.wt = rand(0.8, 1.6); }
+        g.tx = clamp(g.tx, 60, ARENA.w - 60); g.ty = clamp(g.ty, 90, ARENA.h - 50);
+        const ox = g.tx - g.x, oy = g.ty - g.y, d = Math.hypot(ox, oy);
+        const sp = threat ? 340 : 230;
+        if (d > 8) { g.vx = lerp(g.vx, ox / d * sp, 1 - Math.exp(-dt * 8)); g.vy = lerp(g.vy, oy / d * sp, 1 - Math.exp(-dt * 8)); } else { g.vx *= 0.8; g.vy *= 0.8; }
+        g.x += g.vx * dt; g.y += g.vy * dt; collideProps(g);
+        g.hop = Math.max(0, g.hop - dt);
+      }
+    } else if (g.kind === 'brawl') {
+      // the brawl: everyone inside the dust cloud whales on each other
+      for (const e of enemies) {
+        if (!(e.brawlT > 0) || !inRange(e, g.x, g.y, g.r + 30)) continue;
+        e.brawlDmg = (e.brawlDmg || 0) + dt * (14 + wave * 1.2);
+        if (e.brawlDmg >= 5) { const dmg = Math.floor(e.brawlDmg); e.brawlDmg -= dmg; damageEnemy(e, dmg, rand(-1, 1), rand(-1, 1), 40); }
+      }
+      if (Math.random() < dt * 4) { floatText(g.x + rand(-60, 60), g.y - rand(60, 120), pick(POW), pick(['#ffec3d', '#ff9a3d', '#ffffff']), 0.6, 22); Sfx.hit(); }
+    } else if (g.kind === 'paint') {
+      g.x += g.vx * dt; g.y += g.vy * dt; g.vx *= Math.exp(-dt * 1.6); g.vy *= Math.exp(-dt * 1.6);
+      g.r = 40 + (1 - g.life / g.max) * 90; // the splat spreads as it flies
+      if (Math.random() < dt * 40) particles.push({ x: g.x + rand(-g.r, g.r) * 0.6, y: g.y + rand(-g.r, g.r) * 0.3, z: 40, vx: rand(-80, 80), vy: rand(-60, 60), vz: rand(40, 160), life: 0.6, max: 0.6, color: pick(PAINTS), size: rand(4, 8), grav: 700 });
+      for (const e of enemies) {
+        if (g.hits.has(e) || e.dead || e.spawnT > 0) continue;
+        if (Math.hypot(e.x - g.x, (e.y - g.y) * 1.5) > g.r + e.r) continue;
+        g.hits.add(e);
+        e.paintT = e.d.boss ? 1.4 : 4.5; e.artI = randi(0, ART_TITLES.length - 1); e.paintC = randi(0, PAINTS.length - 1);
+        e.st = 'move'; e.hypeT = 0; e.danceT = 0; e.brawlT = 0; e.pickT = 0; e.vx = 0; e.vy = 0;
+        floatText(e.x, e.y - e.h - 30, pick(['Masterpiece!', 'Exquisite!', 'Magnifique!', 'Bravo!']), '#ffffff', 0.8, 20);
+      }
+    } else if (g.kind === 'picket') {
+      g.f -= dt;
+      if (g.f <= 0) { g.f = 1.3; g.chant = ((g.chant || 0) + 1) % CHANTS.length; floatText(g.x + rand(-g.r * 0.6, g.r * 0.6), g.y - 150, CHANTS[g.chant], '#ffffff', 1.2, 20); Sfx.taunt(); }
+    } else if (g.kind === 'vibes') {
+      const t = 1 - g.life / g.max; if (t < 0) continue;
+      g.r = 30 + t * 380;
+      for (const e of enemies) {
+        if (g.hits.has(e) || e.dead || e.spawnT > 0) continue;
+        const d = Math.hypot(e.x - g.x, (e.y - g.y) * 1.6);
+        if (d < g.r + e.r && d > g.r - 70) { g.hits.add(e); e.danceT = Math.max(e.danceT || 0, e.d.boss ? 1.5 : 4.5); e.st = 'move'; e.hypeT = 0; e.sq = -0.2; e.sqV = 0; }
+      }
+    } else if (g.kind === 'gwave') {
+      // rises, rolls forward over everything in its path, then crashes into a big splash
+      const age = g.max - g.life, dx = Math.cos(g.r), dy = Math.sin(g.r), front = gwFront(age);
+      const cx = g.x + dx * front, cy = g.y + dy * front / 1.4;
+      if (age > 0.3 && age < GW_BREAK) for (const e of enemies) {
+        if (e.dead || e.spawnT > 0) continue;
+        const rx = e.x - g.x, ry = (e.y - g.y) * 1.4, along = rx * dx + ry * dy, side = Math.abs(rx * dy - ry * dx);
+        if (side > 85 + e.r || Math.abs(along - front) > 55 + e.r) continue;
+        e.vx += dx * 1300 * dt / e.mass; e.vy += dy * 950 * dt / e.mass; e.hurtT = Math.max(e.hurtT, 0.12); // carried along
+        if (!g.hits.has(e)) { g.hits.add(e); damageEnemy(e, 40 + wave * 4, dx, dy, 450); floatText(e.x, e.y - e.h - 20, pick(['SPLOOSH!', 'GLORP!', 'WIPEOUT!', 'GRAVY!']), '#ffcf8a', 0.8, 24); }
+      }
+      if (age >= GW_BREAK && !g.crash) {
+        g.crash = true; shake = Math.max(shake, 12); Sfx.boom(); Sfx.splash();
+        for (const e of enemies) if (!e.dead && e.spawnT <= 0 && Math.hypot(e.x - cx, (e.y - cy) * 1.4) < 120 + e.r) damageEnemy(e, 30 + wave * 3, (e.x - cx) / 120, (e.y - cy) / 120, 500);
+        for (let i = 0; i < 4; i++) puddles.push({ x: cx + rand(-70, 70) + dx * 30, y: cy + rand(-30, 30) + dy * 20, r: rand(42, 58), life: 6, max: 6, seed: Math.random() * 10 });
+      }
+    } else if (g.kind === 'wave') {
+      const t = 1 - g.life / g.max; g.r = 40 + t * 200;
+      for (const e of enemies) {
+        if (g.hits.has(e) || e.dead || e.spawnT > 0) continue;
+        const d = Math.hypot(e.x - g.x, (e.y - g.y) * 1.6);
+        if (d < g.r + e.r && d > g.r - 60) { g.hits.add(e); damageEnemy(e, 25 + wave * 2, (e.x - g.x) / (d || 1), (e.y - g.y) / (d || 1), 420); }
+      }
+    }
+  }
+  gizmos = gizmos.filter(g => g.life > 0);
+}
+// puppies are irresistible: regular enemies nearby chase the closest one instead of a player
+function pupTarget(e) {
+  if (e.d.boss) return null;
+  let best = null, bd = 480 ** 2;
+  for (const g of gizmos) if (g.kind === 'pup' && g.z <= 0) { const dd = (g.x - e.x) ** 2 + (g.y - e.y) ** 2; if (dd < bd) { bd = dd; best = g; } }
+  if (!best) return null;
+  // stand-in "player" for the AI: can't be hurt
+  if (!best.stand) best.stand = { x: 0, y: 0, z: 0, r: 16, h: 40, vx: 0, vy: 0, inv: 99, dead: false, hp: 1, maxHp: 1, isPup: true, ch: 'grandpa', aim: 0 };
+  return Object.assign(best.stand, { x: best.x, y: best.y, vx: best.vx, vy: best.vy });
+}
+
+// ---------- drawing ----------
+function drawGizmo(g) {
+  if (g.kind === 'ball') {
+    shadow(g.x, g.y, 12, 0.3);
+    const im = IMG.w_ball; if (!im) return;
+    ctx.save(); ctx.translate(g.x, g.y - g.z - 14); ctx.rotate(g.f); ctx.drawImage(im, -15, -15, 30, 30); ctx.restore();
+  } else if (g.kind === 'pup') {
+    const im = IMG.y_puppies; if (!im) return;
+    shadow(g.x, g.y, 14, 0.25);
+    const c = im.height, sz = 52, bob = g.z > 0 ? 0 : Math.abs(Math.sin(g.a * 14)) * 5;
+    ctx.save(); ctx.translate(g.x, g.y - g.z - bob); if (g.vx < -5) ctx.scale(-1, 1);
+    ctx.drawImage(im, (g.f % 4) * c, 0, c, c, -sz / 2, -sz + 4, sz, sz); ctx.restore();
+    if (g.life < 1.2 && Math.floor(g.a * 10) % 2 === 0) return;
+  } else if (g.kind === 'brawl') {
+    const k = Math.min(1, (g.max - g.life) / 0.3) * Math.min(1, g.life / 0.4);
+    ctx.save(); ctx.globalAlpha = 0.85 * k;
+    for (let i = 0; i < 9; i++) {
+      const a = g.a * (2 + i * 0.3) + i * 0.7, rx = Math.cos(a) * 40, ry = Math.sin(a * 1.3) * 18;
+      ctx.fillStyle = i % 2 ? '#d9c8a8' : '#efe2c8';
+      ctx.beginPath(); ctx.arc(g.x + rx, g.y - 40 + ry, 34 + Math.sin(g.a * 9 + i) * 6, 0, Math.PI * 2); ctx.fill();
+    }
+    // flailing fists, feet and stars poking out of the cloud
+    ctx.globalAlpha = k;
+    for (let i = 0; i < 5; i++) {
+      const a = g.a * 6 + i * 1.26, x = g.x + Math.cos(a) * 62, y = g.y - 40 + Math.sin(a) * 30;
+      if (i % 2) { ctx.fillStyle = '#ffe14d'; ctx.beginPath(); for (let s = 0; s < 10; s++) { const rr = s % 2 ? 5 : 11, aa = s * Math.PI / 5 + g.a * 5; ctx.lineTo(x + Math.cos(aa) * rr, y + Math.sin(aa) * rr); } ctx.closePath(); ctx.fill(); }
+      else { ctx.fillStyle = '#c8752d'; ctx.strokeStyle = '#2b1a10'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    }
+    ctx.restore();
+  } else if (g.kind === 'wave') {
+    const t = 1 - g.life / g.max;
+    ctx.save(); ctx.globalAlpha = 1 - t;
+    ctx.strokeStyle = '#7a4416'; ctx.lineWidth = 22 * (1 - t) + 6; ctx.beginPath(); ctx.ellipse(g.x, g.y, g.r, g.r * 0.55, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#b9772f'; ctx.lineWidth = 6; ctx.beginPath(); ctx.ellipse(g.x, g.y - 4, g.r, g.r * 0.55, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  } else if (g.kind === 'paint') {
+    const im = IMG.w_paint; if (!im) return;
+    const sz = g.r * 1.9;
+    ctx.save(); ctx.translate(g.x, g.y - g.z); ctx.rotate(g.f + g.a * 4); ctx.scale(1, 0.75); ctx.globalAlpha = Math.min(1, g.life / 0.2);
+    ctx.drawImage(im, -sz / 2, -sz / 2, sz, sz); ctx.restore();
+  } else if (g.kind === 'vibes') {
+    const t = 1 - g.life / g.max; if (t < 0) return;
+    const R = 30 + t * 380, fade = Math.min(1, t * 4) * (1 - t);
+    ctx.save(); ctx.globalAlpha = fade * 0.75; ctx.lineWidth = 5;
+    RAINBOW.forEach((c, i) => { ctx.strokeStyle = c; const rr = R - i * 6; if (rr > 0) { ctx.beginPath(); ctx.ellipse(g.x, g.y - 20, rr, rr * 0.55, 0, 0, Math.PI * 2); ctx.stroke(); } });
+    // notes, peace signs and hearts surfing the wave
+    ctx.globalAlpha = fade; ctx.textAlign = 'center'; ctx.font = `20px 'Lilita One', sans-serif`; ctx.lineWidth = 3; ctx.strokeStyle = '#2b1a10';
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * Math.PI * 2 + g.f * 3 + t * 1.5, x = g.x + Math.cos(a) * R, y = g.y - 20 + Math.sin(a) * R * 0.55 - Math.sin(t * 12 + i) * 6;
+      if (i % 3 === 2) drawHeart(x, y, 7, '#ff6fae');
+      else { const ch = i % 3 ? '☮' : '♪'; ctx.fillStyle = i % 3 ? '#ffe14d' : '#9affc8'; ctx.strokeText(ch, x, y); ctx.fillText(ch, x, y); }
+    }
+    ctx.restore();
+  } else if (g.kind === 'hearts') {
+    const t = 1 - g.life / g.max;
+    ctx.save(); ctx.globalAlpha = 1 - t;
+    ctx.strokeStyle = 'rgba(255,120,180,.7)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(g.x, g.y, g.r * t, g.r * t * 0.55, 0, 0, Math.PI * 2); ctx.stroke();
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; drawHeart(g.x + Math.cos(a) * g.r * t, g.y + Math.sin(a) * g.r * t * 0.55 - 30 - t * 40, 9, '#ff6fae'); }
+    ctx.restore();
+  }
+}
+const GW_BREAK = 0.95;
+// how far forward the wave crest has rolled
+function gwFront(age) { return age < 0.3 ? 30 : 30 + Math.min(1, (age - 0.3) / (GW_BREAK - 0.3)) * 230; }
+// the wave itself (generated art): rises, rolls forward, then crashes into the splash art
+function drawGWaveCrest(g) {
+  const age = g.max - g.life, dx = Math.cos(g.r), dy = Math.sin(g.r), front = gwFront(age);
+  const x = g.x + dx * front, y = g.y + dy * front / 1.4;
+  const wv = IMG.w_wave, sp = IMG.w_splash;
+  if (wv && age < GW_BREAK + 0.12) {
+    const k = Math.min(1, age / 0.3), H = (40 + 110 * (1 - (1 - k) * (1 - k))) * (1 + Math.sin(age * 14) * 0.03), W = H * 1.05;
+    const alpha = age < GW_BREAK ? 1 : 1 - (age - GW_BREAK) / 0.12;
+    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); if (dx > 0) ctx.scale(-1, 1); // the art curls to the left
+    ctx.drawImage(wv, -W / 2, -H, W, H); ctx.restore();
+    if (age > 0.25 && Math.random() < 0.4) particles.push({ x: x + rand(-W / 3, W / 3), y, z: H * rand(0.6, 0.9), vx: dx * rand(60, 160) + rand(-40, 40), vy: dy * rand(40, 120), vz: rand(80, 200), life: 0.5, max: 0.5, color: pick(['#7a4416', '#a8652c']), size: rand(3, 6), grav: 900 });
+  }
+  if (sp && age >= GW_BREAK) {
+    const t = (age - GW_BREAK) / (g.max - GW_BREAK), W = 150 + 110 * Math.sqrt(t), H = W * sp.height / sp.width;
+    ctx.save(); ctx.globalAlpha = Math.min(1, (1 - t) * 1.8); ctx.drawImage(sp, x - W / 2, y - H * 0.78, W, H); ctx.restore();
+  }
+}
+function drawHeart(x, y, s, col) {
+  ctx.fillStyle = col; ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.9); ctx.bezierCurveTo(x - s * 1.6, y - s * 0.2, x - s * 0.6, y - s * 1.3, x, y - s * 0.4);
+  ctx.bezierCurveTo(x + s * 0.6, y - s * 1.3, x + s * 1.6, y - s * 0.2, x, y + s * 0.9); ctx.fill();
+}
+// effects attached to a player while their power runs (wind cone, goalie bubble, rainbow beam)
+function drawPlayerPowerFx(q) {
+  const kind = CHARS[q.ch].special; if (!SP[kind] || !(q.spT > 0)) return;
+  const dx = Math.cos(q.aim), dy = Math.sin(q.aim), ox = q.x + dx * 40, oy = q.y - 38 + dy * 24;
+  if (kind === 'blower') {
+    ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (let i = 0; i < 9; i++) {
+      const s = ((time * 2.4 + i * 0.37) % 1), spread = (i / 8 - 0.5) * 1.1, a = q.aim + spread * 0.9;
+      const d0 = 30 + s * 360, x = ox + Math.cos(a) * d0, y = oy + Math.sin(a) * d0 * 0.75;
+      ctx.globalAlpha = (1 - s) * 0.8; ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + Math.cos(a + 0.4) * 14, y + Math.sin(a + 0.4) * 14, x + Math.cos(a) * 34, y + Math.sin(a) * 26); ctx.stroke();
+    }
+    ctx.restore();
+  } else if (kind === 'goalie') {
+    drawGoalNet(q, true);
+  } else if (kind === 'rainbow') {
+    const L = 680, hx = q.x + Math.cos(q.aim) * 14, hy = q.y - q.z - q.h * 0.52 + Math.sin(q.aim) * 8;
+    const fadeIn = Math.min(1, (SP.rainbow.dur - q.spT) / 0.15), fadeOut = Math.min(1, q.spT / 0.25);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    ctx.translate(hx, hy); ctx.rotate(q.aim);
+    const reach = L * fadeIn;
+    // six thin stripes riding the same travelling sine wave (calm at her heart, rippling further out)
+    const wy = (x, off) => off + Math.sin(x * 0.045 - time * 16) * Math.min(1, x / 120) * 11;
+    RAINBOW.forEach((c, i) => {
+      ctx.strokeStyle = c; ctx.globalAlpha = 0.85 * fadeOut; ctx.lineWidth = 3.4;
+      ctx.beginPath(); for (let x = 0; x <= reach; x += 8) { const y = wy(x, (i - 2.5) * 3.2); x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+    });
+    ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = 0.55 * fadeOut; ctx.lineWidth = 2;
+    ctx.beginPath(); for (let x = 0; x <= reach; x += 8) { const y = wy(x, 0); x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+    // little hearts surfing outward on the wave
+    ctx.globalAlpha = 0.95 * fadeOut;
+    for (let i = 0; i < 7; i++) { const x = (time * 520 + i * 97) % L; if (x > reach) continue; drawHeart(x, wy(x, 0), 4 + Math.min(1, x / 200) * 3, i % 2 ? '#ffffff' : '#ffb3d9'); }
+    ctx.restore();
+    // the glowing, beating heart on her chest
+    const beat = 1 + Math.max(0, Math.sin(time * 14)) * 0.25;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = fadeOut;
+    const g = ctx.createRadialGradient(hx, hy, 2, hx, hy, 26 * beat); g.addColorStop(0, 'rgba(255,170,220,.9)'); g.addColorStop(1, 'rgba(255,120,200,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(hx, hy, 26 * beat, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.save(); ctx.globalAlpha = fadeOut; drawHeart(hx, hy + 2, 7 * beat, '#ff4f9a'); drawHeart(hx - 1.5, hy, 3 * beat, '#ffd0e6'); ctx.restore();
+  }
+}
+// Taylor's goal: white posts around her joined by a crossbar rim, with net between them.
+// The back half draws behind her, the front half in front, so she's standing inside the goal.
+function drawGoalNet(q, front) {
+  // a dome of goal netting over her: white post-style ribs, a mesh of strings, a soft bubble sheen.
+  // The back half draws behind her, the front half in front.
+  const R = 104, RY = 56, H = 130, fade = Math.min(1, q.spT / 0.35, (SP.goalie.dur - q.spT) / 0.2 + 0.2);
+  const bob = 1 + Math.sin(time * 5) * 0.015;
+  const P = (a, t) => { const hr = Math.cos(t * Math.PI / 2) * bob, vt = Math.sin(t * Math.PI / 2); return [q.x + Math.cos(a) * R * hr, q.y + Math.sin(a) * RY * hr - H * vt * bob]; };
+  const isFront = a => Math.sin(a) > 0;
+  const arc = (a, t0, t1, n) => { for (let i = 0; i <= n; i++) { const [x, y] = P(a, t0 + (t1 - t0) * i / n); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } };
+  const ring = (t, n) => { let on = false; for (let i = 0; i <= n; i++) { const a = i / n * Math.PI * 2; if (isFront(a) !== front) { on = false; continue; } const [x, y] = P(a, t); if (!on) { ctx.moveTo(x, y); on = true; } else ctx.lineTo(x, y); } };
+  ctx.save(); ctx.globalAlpha = fade; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (!front) { // bubble sheen inside the dome
+    const g = ctx.createRadialGradient(q.x - R * 0.3, q.y - H * 0.75, 10, q.x, q.y - H * 0.45, R * 1.1);
+    g.addColorStop(0, 'rgba(255,255,255,.18)'); g.addColorStop(0.7, 'rgba(200,240,255,.08)'); g.addColorStop(1, 'rgba(200,240,255,.2)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(q.x, q.y - H * 0.42, R * bob, H * 0.62 * bob, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  // netting: meridians and rings
+  ctx.strokeStyle = 'rgba(245,250,255,.6)'; ctx.lineWidth = 1.4; ctx.beginPath();
+  const M = 28;
+  for (let i = 0; i < M; i++) { const a = i / M * Math.PI * 2 + 0.06; if (isFront(a) === front) arc(a, 0, 1, 10); }
+  for (let r = 1; r <= 6; r++) ring(r / 7, 48);
+  ctx.stroke();
+  // goalpost-white frame: base ring and four ribs over the top
+  const white = (draw, w) => { ctx.strokeStyle = '#3a4048'; ctx.lineWidth = w + 3; ctx.beginPath(); draw(); ctx.stroke(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = w; ctx.beginPath(); draw(); ctx.stroke(); };
+  white(() => ring(0, 64), 6);
+  for (let i = 0; i < 4; i++) { const a = Math.PI / 4 + i * Math.PI / 2; if (isFront(a) === front) white(() => arc(a, 0, 1, 14), 5); }
+  if (front && q.saveT > time) { // the net bulges when it stops a shot
+    ctx.globalAlpha = fade * (q.saveT - time) / 0.3; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(q.x, q.y - H * 0.42, R * 1.08, H * 0.66, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+}
+// what a status effect looks like on an enemy
+function drawEnemyStatus(e) {
+  const top = e.y - e.z - e.h;
+  if (e.paintT > 0 && IMG.w_frame) {
+    const im = IMG.w_frame, fh = e.h * 1.3 + 20, fw = Math.max(fh * im.width / im.height, e.r * 2.6), cy = e.y - e.z - e.h * 0.5;
+    const wob = e.paintT < 0.8 ? Math.sin(time * 40) * 2 : 0; // trembling before it breaks free
+    // splashed with paint (the generated splat art, small and see-through)
+    if (IMG.w_paint) { const ps = e.r * 1.4; ctx.save(); ctx.globalAlpha = 0.6; ctx.translate(e.x, cy); ctx.rotate((e.paintC || 0) * 1.1 + e.seed); ctx.drawImage(IMG.w_paint, -ps / 2, -ps / 2, ps, ps); ctx.restore(); }
+    ctx.drawImage(im, e.x - fw / 2 + wob, cy - fh / 2, fw, fh);
+    // the gallery placard
+    const label = artLabel(e);
+    ctx.font = `11px 'Nunito', sans-serif`; ctx.textAlign = 'center';
+    const tw = ctx.measureText(label).width + 12, py = cy + fh / 2 + 6;
+    ctx.fillStyle = '#f7f1e3'; ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(e.x - tw / 2, py, tw, 17, 3); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#3b2414'; ctx.fillText(label, e.x, py + 12.5);
+    return;
+  }
+  if (e.pickT > 0 && IMG.w_sign) {
+    const im = IMG.w_sign, w = Math.max(74, e.r * 2.4), h = w * im.height / im.width, bob = Math.abs(Math.sin(e.t * 6)) * 5;
+    const sx = e.x + (e.flipX ? -8 : 8), sy = e.y - e.z - e.h * 0.45 - h - bob;
+    ctx.save(); ctx.translate(sx, sy + h); ctx.rotate(Math.sin(e.t * 3 + e.seed) * 0.08); ctx.translate(0, -h);
+    ctx.drawImage(im, -w / 2, 0, w, h);
+    // the slogan, hand-lettered in marker on the cardboard
+    const txt = SIGNS[(e.signI || 0) % SIGNS.length], words = txt.split(' '), lines = [];
+    let cur = ''; for (const wd of words) { if ((cur + ' ' + wd).trim().length > 10 && cur) { lines.push(cur); cur = wd; } else cur = (cur + ' ' + wd).trim(); } if (cur) lines.push(cur);
+    const fs = Math.min(15, (w * 0.86) / Math.max(...lines.map(l => l.length)) * 1.7);
+    ctx.font = `${fs}px 'Lilita One', sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = (e.signI || 0) % 3 === 0 ? '#b0201a' : '#1f2a44';
+    const cy = h * 0.36; lines.forEach((l, i) => ctx.fillText(l, 0, cy + (i - (lines.length - 1) / 2) * fs * 1.05));
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
+  if (e.danceT > 0) {
+    for (let i = 0; i < 2; i++) { const t = (time * 0.8 + i * 0.5 + e.seed) % 1; ctx.globalAlpha = 1 - t; drawHeart(e.x + Math.sin(t * 6 + i * 3) * 14, top - t * 40, 7, i ? '#ff6fae' : '#ff9ad0'); }
+    ctx.globalAlpha = 1;
+    ctx.font = `18px 'Lilita One', sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = '#ffd84a'; ctx.fillText('☮', e.x + Math.sin(time * 3 + e.seed) * 16, top - 6);
+  }
+  if (e.sleepT > 0) {
+    ctx.font = `bold 16px 'Lilita One', sans-serif`; ctx.textAlign = 'center';
+    for (let i = 0; i < 3; i++) { const t = (time * 0.7 + i / 3 + e.seed) % 1; ctx.globalAlpha = Math.sin(t * Math.PI); ctx.fillStyle = '#d8e8ff'; ctx.strokeStyle = '#2b3a5a'; ctx.lineWidth = 3; const x = e.x + e.r * 0.4 + t * 26, y = top + 4 - t * 36; ctx.strokeText('z', x, y); ctx.fillText('z', x, y); }
+    ctx.globalAlpha = 1;
+  }
+}
+// confetti and flowers: how Izzy's rainbow finishes an enemy
+function confettiBurst(x, y, h) {
+  for (let i = 0; i < 46; i++) particles.push({ x, y, z: h * 0.5, vx: rand(-260, 260), vy: rand(-180, 180), vz: rand(160, 480), life: rand(1, 1.8), max: 1.8, color: pick(RAINBOW), size: rand(4, 7), grav: 420, feather: true, confetti: true, rot: rand(0, 6) });
+  for (let i = 0; i < 12; i++) particles.push({ x, y, z: h * 0.5, vx: rand(-200, 200), vy: rand(-140, 140), vz: rand(120, 360), life: rand(1.4, 2.2), max: 2.2, color: pick(['#ff6fae', '#ffd84a', '#ffffff', '#b98aff']), size: rand(7, 11), grav: 500, flower: true, rot: rand(0, 6) });
+}
+
 // ---------- the campaign: 20 hand-made levels, a boss every 5, then an endless feast ----------
 const BASE = [['turkey', 3], ['potato', 3]];
 const ALL = [['turkey', 3], ['potato', 3], ['cranberry', 2], ['corn', 4], ['pumpkin', 8]];
@@ -976,6 +1522,7 @@ function update(dt) {
   updateRoasts(dt);
   updateCans(dt);
   updateFlames(dt);
+  updateGizmos(dt);
   updateFire(dt);
   if (yardSpr) updateYard(dt);
   updateBombs(dt);
@@ -1184,6 +1731,10 @@ function updatePlayer(dt) {
     if (p.jumpT <= 0 || p.z <= 0) { p.z = 0; p.jumpT = 0; p.vz = 0; stompLand(p); }
   }
   p.roastCd -= dt; p.roastFlash -= dt;
+  // ----- the family powers -----
+  if (I.special && SP[c.special] && p.spCd <= 0 && p.spT <= 0 && !p.dead) startSpecial(p);
+  p.spCd -= dt;
+  if (p.spT > 0 && SP[c.special]) tickSpecial(p, dt);
   p.chargeCd -= dt;
   if (p.chargeWind > 0) {
     p.chargeWind -= dt;
@@ -1222,11 +1773,11 @@ function updatePlayer(dt) {
     }
     if (Math.random() < 0.8) particles.push({ x: p.x, y: p.y, z: 0, vx: 0, vy: 0, vz: 0, life: 0.2, max: 0.2, ghost: true, anim: p.ch, row: 'act', frame: 1, flip: p.chargeDir[0] < 0, h: p.h, img: p.ch, face: p.chargeDir[0] < 0 ? -1 : 1 });
     if (Math.random() < 0.9) particles.push({ x: p.x + rand(-10, 10), y: p.y, z: 2, vx: -p.vx * 0.15 + rand(-40, 40), vy: -p.vy * 0.15 + rand(-30, 30), vz: rand(30, 100), life: 0.4, max: 0.4, color: 'rgba(214,196,156,.85)', size: rand(5, 9), grav: 250 });
-    if (p.chargeT <= 0) { p.chargeCd = 6; p.vx *= 0.35; p.vy *= 0.35; p.sq = 0.25; p.sqV = 0; dustBurst(p.x, p.y, 10, 1.2); }
+    if (p.chargeT <= 0) { p.chargeCd = CHARGE_CD; p.vx *= 0.35; p.vy *= 0.35; p.sq = 0.25; p.sqV = 0; dustBurst(p.x, p.y, 10, 1.2); }
   }
-  const charging = p.chargeT > 0 || p.chargeWind > 0;
+  const charging = p.chargeT > 0 || p.chargeWind > 0 || (c.special === 'flop' && p.spT > 0);
 
-  const sp = p.speed * (inPond(p.x, p.y) ? 0.6 : 1);
+  const sp = p.speed * (inPond(p.x, p.y) ? 0.6 : 1) * (p.spT > 0 && SP[c.special] && SP[c.special].slow || 1);
   const pvx = p.vx, pvy = p.vy;
   if (charging) {
     // velocity set by the charge above
@@ -1264,7 +1815,7 @@ function updatePlayer(dt) {
   p.aim = ai.a;
   if (I.swap) cycleWeapon(I.swap);
   if (I.weapon) selectWeapon(I.weapon);
-  const busyMouth = p.breathT > 0 || p.chewT > 0;
+  const busyMouth = p.breathT > 0 || p.chewT > 0 || (p.spT > 0 && SP[c.special] && SP[c.special].busy);
   if (p.breathT > 0) breatheFire(p, dt);
   if (ai.fire && p.fireCd <= 0 && !charging && !busyMouth) { fire(ai); p.lastFire = 0; }
   if (I.bomb && p.bombs > 0 && p.bombCd <= 0 && !charging) { throwBomb(ai); p.lastFire = 0; }
@@ -1377,7 +1928,7 @@ function hitProp(b) {
 function updateEnemies(dt) {
   let p = player;
   for (const e of enemies) {
-    p = player = targetOf(e);
+    p = player = pupTarget(e) || targetOf(e);
     e.t += dt; e.flash -= dt; e.cd -= dt; e.stT -= dt; e.hurtT -= dt;
     const d = e.d, ai = d.ai;
 
@@ -1590,6 +2141,60 @@ function updateEnemies(dt) {
       accel *= 2.5;
       if (Math.random() < dt * 25) particles.push({ x: e.x + rand(-e.r, e.r), y: e.y, z: rand(10, e.h), vx: rand(-60, 60), vy: rand(-40, 40), vz: rand(40, 140), life: 0.3, max: 0.3, color: pick(['#ffe14d', '#ffffff', '#5ab4ff']), size: rand(2, 5), grav: 300 });
     }
+    // David's guitar: a hippie dance party. Partners pair up, sway and hug instead of fighting
+    if (e.held) {
+      // in a luchador's grip: no say in the matter
+      dvx = 0; dvy = 0; e.vx = 0; e.vy = 0; accel = 0; act = 0; e.cd = Math.max(e.cd, 0.5);
+      if (e.st !== 'move' && e.st !== 'land') e.st = 'move';
+      if (!players.some(q => q.grabId === e.id && q.spT > 0)) e.held = false; // let go if the luchador stopped
+    } else if (e.thrownT > 0) {
+      // flung: a living cannonball that bowls over everyone it hits
+      e.thrownT -= dt; dvx = e.vx; dvy = e.vy; accel = 0; act = 0;
+      for (const o of enemies) {
+        if (o === e || o.dead || o.spawnT > 0 || e.throwHits.has(o)) continue;
+        const ox = o.x - e.x, oy = o.y - e.y, od = Math.hypot(ox, oy);
+        if (od > o.r + e.r + 6) continue;
+        e.throwHits.add(o);
+        const sp = Math.hypot(e.vx, e.vy) || 1;
+        damageEnemy(o, 40 + wave * 4, e.vx / sp, e.vy / sp, 650); damageEnemy(e, 12 + wave, 0, 0, 0);
+        floatText(o.x, o.y - o.h - 20, pick(['STRIKE!', 'BOWLED!', 'KABOOM!', 'POW!']), '#ffec3d', 0.7, 24); shake = Math.max(shake, 8);
+        e.vx *= 0.75; e.vy *= 0.75;
+      }
+      if (e.x < 40 || e.x > ARENA.w - 40 || e.y < 60 || e.y > ARENA.h - 40) { e.thrownT = 0; damageEnemy(e, 20 + wave * 2, 0, 0, 0); shake = Math.max(shake, 8); }
+      if (e.dead) continue;
+    } else if (e.paintT > 0) {
+      // framed: a still life. Not moving, not attacking, until it wears off (or someone shatters it)
+      e.paintT -= dt; dvx = 0; dvy = 0; e.vx = 0; e.vy = 0; act = null; e.cd = Math.max(e.cd, 0.4); accel = 99999;
+      if (e.st !== 'move' && e.st !== 'land') e.st = 'move';
+      if (e.paintT <= 0) { artShatter(e.x, e.y, e.h); netEvent('a', [Math.round(e.x), Math.round(e.y), e.h]); }
+    } else if (e.sleepT > 0) {
+      e.sleepT -= dt; dvx = 0; dvy = 0; act = null; e.cd = Math.max(e.cd, 0.4); accel = 2500;
+      if (e.st !== 'move' && e.st !== 'land') e.st = 'move';
+    } else if (e.danceT > 0) {
+      e.danceT -= dt; act = null; e.cd = Math.max(e.cd, 0.4);
+      if (e.st !== 'move' && e.st !== 'land') e.st = 'move';
+      let mate = e.mate;
+      if (!mate || mate.dead || !(mate.danceT > 0)) { mate = null; let bd = 400 ** 2; for (const o of enemies) { if (o === e || o.dead || !(o.danceT > 0)) continue; const dd = (o.x - e.x) ** 2 + (o.y - e.y) ** 2; if (dd < bd) { bd = dd; mate = o; } } e.mate = mate; }
+      const sway = Math.sin(e.t * 6 + e.seed) * 60;
+      if (mate) { const mx = mate.x - e.x, my = mate.y - e.y, md = Math.hypot(mx, my) || 1, close = md < e.r + mate.r + 6; dvx = close ? sway : mx / md * e.speed * 0.9 + sway; dvy = close ? Math.cos(e.t * 6) * 20 : my / md * e.speed * 0.9; }
+      else { dvx = sway; dvy = Math.cos(e.t * 4 + e.seed) * 40; }
+      accel *= 1.5;
+    } else if (e.pickT > 0) {
+      // on strike: walk to their spot in the picket line, then march back and forth with a sign
+      e.pickT -= dt; act = null; e.cd = Math.max(e.cd, 0.4);
+      if (e.st !== 'move' && e.st !== 'land') e.st = 'move';
+      const march = Math.sin(e.t * 1.6 + e.pickX * 0.01) * 34, tx = e.pickX + march - e.x, ty = e.pickY - e.y, td = Math.hypot(tx, ty) || 1;
+      const spd = td > 50 ? e.speed * 1.6 : Math.min(e.speed * 0.6, td * 3);
+      dvx = tx / td * spd; dvy = ty / td * spd; accel *= 2;
+    } else if (e.brawlT > 0) {
+      // Jay's turkey call: everyone piles into the brawl cloud
+      e.brawlT -= dt; act = null; e.cd = Math.max(e.cd, 0.4);
+      if (e.st !== 'move' && e.st !== 'land') e.st = 'move';
+      const bx = e.brawlX - e.x, by = e.brawlY - e.y, bd = Math.hypot(bx, by) || 1;
+      if (bd > 40) { dvx = bx / bd * e.speed * 2.2; dvy = by / bd * e.speed * 2.2; } else { dvx = Math.sin(e.t * 20 + e.seed) * 120; dvy = Math.cos(e.t * 17 + e.seed) * 80; }
+      accel *= 3;
+    }
+    if (e.rainbowT > 0) e.rainbowT -= dt;
     if (airborne) accel *= 0.05;
 
     // integrate with an acceleration limit (mass => momentum)
@@ -1629,7 +2234,7 @@ function updateEnemies(dt) {
     e.face = dx > 0 ? 1 : -1;
 
     // contact damage (anyone touching it, not just its target)
-    if (e.z < 30 && !(e.sulkT > 0) && !(e.hypeT > 0) && !(e.downT > 0) && !(e.meltT > 0)) for (const q of players) {
+    if (e.z < 30 && !(e.sulkT > 0) && !(e.hypeT > 0) && !(e.downT > 0) && !(e.meltT > 0) && !(e.sleepT > 0) && !(e.danceT > 0) && !(e.brawlT > 0) && !(e.pickT > 0) && !(e.paintT > 0) && !e.held && !(e.thrownT > 0)) for (const q of players) {
       if (q.inv > 0 || q.dead) continue;
       const qd = Math.hypot(q.x - e.x, q.y - e.y);
       if (qd < e.r + q.r) hurtPlayer(d.dmg * (e.st === 'dash' || e.st === 'lunge' || e.st === 'roll' ? 1.4 : 1), (q.x - e.x) / (qd || 1), (q.y - e.y) / (qd || 1), q);
@@ -1759,6 +2364,8 @@ function hurtPlayer(dmg, nx, ny, p = player) {
 
 function damageEnemy(e, dmg, kx, ky, kb = 120) {
   if (e.spawnT > 0) return;
+  if (e.sleepT > 0 || e.danceT > 0 || e.pickT > 0) dmg *= 1.5;
+  if (e.paintT > 0) dmg *= 2; // fragile art // napping and dancing enemies are easy pickings
   e.hp -= dmg; e.flash = 0.08;
   // knockback is an impulse divided by mass; big hits briefly stagger
   const imp = kb * 1.7 / e.mass;
@@ -1791,8 +2398,9 @@ function killEnemy(e) {
   const colors = { turkey: ['#7a4a22', '#c8752d', '#e8b05a', '#c0392b'], potato: ['#c9a463', '#f2d16b', '#8a6a3a'], tot: ['#c9a463', '#f2d16b'],
     cranberry: ['#b0102a', '#ff5a6e', '#6e0a1a'], corn: ['#f4c430', '#fff2a0', '#4a8a2a'], pumpkin: ['#e8742a', '#ffb347', '#3d6b22'], boss: ['#7a4a22', '#c8752d', '#e8b05a', '#c0392b', '#222'],
     mashboss: ['#c9a463', '#f2d16b', '#8a5a2a', '#fff2c0'], gourdboss: ['#e8742a', '#ffb347', '#3d6b22', '#ffd36a'], cornboss: ['#f4c430', '#fff2a0', '#4a8a2a', '#ffe14d'] }[e.type] || ['#c8752d', '#e8b05a'];
-  deathBurst(e.x, e.y, e.h, e.type, colors);
-  netEvent('k', [Math.round(e.x), Math.round(e.y), e.h, e.type]);
+  const party = e.rainbowT > 0, art = e.paintT > 0;
+  if (party) confettiBurst(e.x, e.y, e.h); else if (art) { artShatter(e.x, e.y, e.h); deathBurst(e.x, e.y, e.h, e.type, colors); } else deathBurst(e.x, e.y, e.h, e.type, colors);
+  netEvent('k', [Math.round(e.x), Math.round(e.y), e.h, e.type, party ? 1 : art ? 2 : 0]);
   // the body: flung along the killing blow, tumbles, bounces, settles, then fades into the lawn
   const [hx, hy, kb] = e.lastHit || [Math.sign(e.x - me.x) || 1, 0, 120];
   const fling = clamp(kb * 2.2, 160, 900) / Math.sqrt(e.mass);
@@ -2036,6 +2644,7 @@ function drawCan(c) {
 
 function stompLand(p) {
   const R = 330;
+  p.stompCd = STOMP_CD;
   shake = Math.max(shake, 22); hitStop = Math.max(hitStop, 0.08);
   p.sq = 0.4; p.sqV = 0;
   Sfx.boom();
@@ -2283,8 +2892,8 @@ function updateMisc(dt) {
         else {
           p.scraps++;
           Sfx.clank();
-          if (p.scraps >= 5) { player = p; assembleMac(); player = me; }
-          else floatText(p.x, p.y - 110, `Scrap ${p.scraps}/5`, '#cfd8dc', 0.9, 17);
+          if (p.scraps >= SCRAPS_NEEDED) { player = p; assembleMac(); player = me; }
+          else floatText(p.x, p.y - 110, `Scrap ${p.scraps}/${SCRAPS_NEEDED}`, '#cfd8dc', 0.9, 17);
         }
       }
       else if (it.kind === 'weapon') {
@@ -2679,6 +3288,11 @@ function render() {
   // puddles
   for (const pu of puddles) {
     const a = Math.min(1, pu.life / 1) * 0.85;
+    if (IMG.d_gravy) { // generated gravy puddle art (mirrored for variety)
+      const im = IMG.d_gravy, w = pu.r * 2.4, h = w * im.height / im.width;
+      ctx.save(); ctx.globalAlpha = a; ctx.translate(pu.x, pu.y); if ((pu.seed * 10 | 0) % 2) ctx.scale(-1, 1);
+      ctx.drawImage(im, -w / 2, -h / 2, w, h); ctx.restore(); continue;
+    }
     ctx.fillStyle = `rgba(110,62,22,${a})`;
     ctx.beginPath();
     for (let i = 0; i <= 12; i++) { const an = i / 12 * Math.PI * 2, rr = pu.r * (0.85 + 0.15 * Math.sin(an * 3 + pu.seed)); const px = pu.x + Math.cos(an) * rr, py = pu.y + Math.sin(an) * rr * 0.55; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
@@ -2715,6 +3329,12 @@ function render() {
   for (const c of corpses) list.push([c.y - 2, () => drawCorpse(c)]);
   for (const e of enemies) list.push([e.y, () => drawEnemy(e)]);
   for (const q of players) list.push([q.y, () => { player = q; drawPlayer(); if (NET) drawNameTag(q); player = me; }]);
+  for (const q of players) if (q.spT > 0 && SP[CHARS[q.ch].special]) {
+    list.push([q.y + 1, () => drawPlayerPowerFx(q)]);
+    if (CHARS[q.ch].special === 'goalie') list.push([q.y - 1, () => drawGoalNet(q, false)]);
+  }
+  for (const g of gizmos) list.push([g.kind === 'brawl' ? g.y + 60 : g.kind === 'vibes' ? g.y + 400 : g.kind === 'wave' || g.kind === 'hearts' ? g.y - 200 : g.y, () => drawGizmo(g)]);
+  for (const g of gizmos) if (g.kind === 'gwave') list.push([g.y + Math.sin(g.r) * gwFront(g.max - g.life) / 1.4 + 2, () => drawGWaveCrest(g)]);
   for (const it of pickups) list.push([it.y, () => drawPickup(it)]);
   for (const b of bullets) list.push([b.y, () => drawBullet(b)]);
   for (const r of roasts) list.push([r.y, () => drawRoast(r)]);
@@ -2792,6 +3412,10 @@ function drawEnemyBody(e) {
   let shiver = (e.st === 'wind' || e.st === 'aim') ? Math.sin(e.t * 70) * 2 : e.stuckT > 0 ? Math.sin(e.t * 40) * 2.5 : e.sulkT > 0 ? Math.sin(e.t * 30) * 1.5 : 0;
   let rot = e.lean, ey = e.y - e.z;
   if (e.hypeT > 0) { shiver = rand(-3.5, 3.5); ey += rand(-2, 2); rot += Math.sin(e.t * 40) * 0.12; }
+  if (e.sleepT > 0) { rot = (e.flipX ? -1 : 1) * 0.28 + Math.sin(e.t * 2) * 0.03; shiver = 0; }   // dozing, slumped over
+  if (e.paintT > 0) { rot = 0; shiver = 0; } // a still life holds perfectly still
+  if (e.held || e.thrownT > 0) { rot = e.t * 13; shiver = 0; } // spun round and round / tumbling through the air
+  if (e.danceT > 0) { rot += Math.sin(e.t * 6 + e.seed) * 0.28; ey -= Math.abs(Math.sin(e.t * 6 + e.seed)) * 6; } // grooving
   if (e.downT > 0) {
     // knocked flat: tipped over on its back, legs kicking, with periodic failed attempts to sit up
     const el = e.downMax - e.downT, ph = el % 0.9;
@@ -2809,6 +3433,7 @@ function drawEnemyBody(e) {
   if (e.stuckT > 0) drawCheeseWeb(e);
   if (e.downT > 0) drawDizzy(e);
   if (e.hypeT > 0) drawZaps(e);
+  if (e.danceT > 0 || e.sleepT > 0 || e.pickT > 0 || e.paintT > 0) drawEnemyStatus(e);
   if (e.meltT > 0) drawMelt(e);
   if (e.burnT > 0) { drawBurning(e); if (fireSpr) drawEnemyFire(e); }
   if (e.hp < e.maxHp && !e.d.boss) {
@@ -2844,7 +3469,8 @@ function waterline(x, y, r) {
 }
 function drawPlayerBody() {
   const p = player, A = AN[p.ch];
-  const blink = p.inv > 0 && !p.dead && p.dashT <= 0 && p.jumpT <= 0 && Math.floor(time * 20) % 2 === 0;
+  // damage flicker (not while a power is running: the flop and the goalie shield also make you invulnerable)
+  const blink = p.inv > 0.2 && !p.dead && p.dashT <= 0 && p.jumpT <= 0 && !(p.spT > 0) && Math.floor(time * 20) % 2 === 0;
   let row = p.dir, frame = p.frame, flip = p.flipX, showGun = true;
   if (p.dead) { row = 'act'; frame = 2; showGun = false; flip = p.vx > 0 ? false : p.vx < 0 ? true : flip; }
   else if (p.chargeT > 0) { row = 'act'; frame = 1; flip = p.chargeDir[0] < 0; showGun = false; }
@@ -2852,6 +3478,14 @@ function drawPlayerBody() {
   else if (p.jumpT > 0) { row = 'act'; frame = 3; showGun = false; flip = false; }
   else if (p.chewT > 0 || p.breathT > 0) showGun = false;
   else if (p.dashT > 0) { row = 'act'; frame = 1; flip = p.dashDir[0] < 0; showGun = false; }
+  else if (CHARS[p.ch].special === 'flop' && p.spT > 0) { row = 'act'; frame = 1; flip = p.vx < 0; showGun = false; }
+  else if (CHARS[p.ch].special === 'luchador' && p.spT > 0 && AN.jaylucha) {
+    // transformed: lunge, airplane spin, throw, then a big flex
+    const age = SP.luchador.dur - p.spT, fr = age < 0.25 ? 0 : age < 1.85 ? 1 : age < 2.0 ? 2 : 3;
+    const lf = fr === 3 ? false : Math.cos(p.spinA || 0) < 0;
+    drawAnim('jaylucha', 'act', fr, p.x, p.y - p.z, p.h * 1.12, lf, { flash: p.flash });
+    return;
+  }
   else if (p.hurtT > 0) { row = 'act'; frame = 0; showGun = false; }
   else if (p.victoryT > 0 && Math.hypot(p.vx, p.vy) < 30 && p.lastFire > 0.5) { row = 'act'; frame = 3; showGun = false; flip = false; }
   const breathe = row !== 'act' && Math.hypot(p.vx, p.vy) < 25 ? Math.sin(time * 3) * 0.015 : 0;
@@ -2861,15 +3495,17 @@ function drawPlayerBody() {
   const behind = row === 'back';
   const drawGun = () => {
     if (!showGun) return;
-    const w = WEAPONS[p.cur], im = IMG[w.img]; if (!im) return;
+    const spk = SP[CHARS[p.ch].special], held = p.spT > 0 && spk && spk.held;
+    const w = WEAPONS[p.cur], im = IMG[held || w.img]; if (!im) return;
     const a = p.gunAng, fl = Math.cos(a) < 0;
     // held at the hand: side view -> front hand; front view -> off to the right hip; back view -> behind
     const hx = row === 'side' ? (flip ? -12 : 12) : row === 'front' ? 17 : -14;
     const gx = p.x + hx + Math.cos(a) * 6, gy = p.y - p.z - p.h * (row === 'back' ? 0.4 : 0.32) + stepBob + Math.sin(a) * 6;
     ctx.save(); ctx.translate(gx, gy); ctx.rotate(a + p.lean * 0.5); if (fl) ctx.scale(1, -1);
-    const gw = p.cur === 'pie' ? 34 : 50, gh = gw * im.height / im.width;
+    const gw = held ? (held === 'w_guitar' ? 40 : 46) : p.cur === 'pie' ? 34 : 50, gh = gw * im.height / im.width;
     const kick = p.fireCd > 0 ? Math.max(0, p.fireCd / (w.rate || 1)) * (p.cur === 'cran' ? 12 : 5) : 0;
-    ctx.drawImage(im, -gw * 0.3 - kick, -gh / 2, gw, gh);
+    if (held === 'w_blower') { ctx.scale(-1, 1); ctx.drawImage(im, -gw * 0.7, -gh / 2, gw, gh); } // art faces left
+    else ctx.drawImage(im, -gw * 0.3 - kick, -gh / 2, gw, gh);
     ctx.restore();
   };
   if (behind) drawGun();
@@ -2991,6 +3627,13 @@ function drawParticle(pt) {
   }
   ctx.globalAlpha = Math.min(1, a * 2);
   ctx.fillStyle = pt.color;
+  if (pt.note) { ctx.font = `${pt.size + 4}px 'Lilita One', sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#2b1a10'; ctx.strokeText('♪', pt.x, pt.y - pt.z); ctx.fillText('♪', pt.x, pt.y - pt.z); ctx.globalAlpha = 1; return; }
+  if (pt.flower) {
+    ctx.save(); ctx.translate(pt.x, pt.y - pt.z); ctx.rotate(pt.rot);
+    for (let i = 0; i < 5; i++) { ctx.rotate(Math.PI * 2 / 5); ctx.beginPath(); ctx.ellipse(pt.size * 0.55, 0, pt.size * 0.55, pt.size * 0.32, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.arc(0, 0, pt.size * 0.3, 0, Math.PI * 2); ctx.fill(); ctx.restore(); ctx.globalAlpha = 1; return;
+  }
+  if (pt.confetti) { ctx.save(); ctx.translate(pt.x, pt.y - pt.z); ctx.rotate(pt.rot); ctx.scale(1, Math.abs(Math.sin(pt.rot * 2)) + 0.2); ctx.fillRect(-pt.size / 2, -pt.size / 4, pt.size, pt.size / 2); ctx.restore(); ctx.globalAlpha = 1; return; }
   if (pt.feather) {
     ctx.save(); ctx.translate(pt.x, pt.y - pt.z); ctx.rotate(pt.rot);
     ctx.beginPath(); ctx.ellipse(0, 0, pt.size * 1.4, pt.size * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
@@ -3092,8 +3735,8 @@ function drawHUD() {
       hudText(`${Math.ceil(p.macT)}s`, x + sw / 2, y + sw - 5, 13, '#fff', 'center');
       ctx.fillStyle = '#2b1a10'; ctx.fillRect(x, y + sw + 3, sw, 6); ctx.fillStyle = '#ffd84a'; ctx.fillRect(x, y + sw + 3, sw * p.macT / 10, 6);
     } else {
-      hudText(`${p.scraps}/5`, x + sw / 2, y + sw - 5, 13, '#fff', 'center');
-      for (let i = 0; i < 5; i++) { ctx.fillStyle = i < p.scraps ? '#cfd8dc' : '#2b1a10aa'; ctx.fillRect(x + 4 + i * (sw - 8) / 5, y + sw + 3, (sw - 8) / 5 - 2, 5); }
+      hudText(`${p.scraps}/${SCRAPS_NEEDED}`, x + sw / 2, y + sw - 5, 13, '#fff', 'center');
+      for (let i = 0; i < SCRAPS_NEEDED; i++) { ctx.fillStyle = i < p.scraps ? '#cfd8dc' : '#2b1a10aa'; ctx.fillRect(x + 4 + i * (sw - 8) / SCRAPS_NEEDED, y + sw + 3, (sw - 8) / SCRAPS_NEEDED - 2, 5); }
     }
   } else if (c.special === 'taunt' || c.special === 'can' || c.special === 'stomp' || c.special === 'slime' || c.special === 'chili') {
     hudSlots.push({ k: 'special', x, y, w: sw });
@@ -3105,12 +3748,23 @@ function drawHUD() {
     hudText(S[0], x + sw / 2, y + sw / 2 + 2, isTouch ? 11 : 13, '#fff', 'center');
     if (!isTouch) hudText('F', x + 9, y + 15, 11, '#fff4dc', 'center');
     const tb = $('tSpecial'); if (tb) tb.style.opacity = ready ? '1' : '0.45';
+  } else if (SP[c.special]) {
+    hudSlots.push({ k: 'special', x, y, w: sw });
+    const S = SP[c.special], active = p.spT > 0, ready = p.spCd <= 0 && !active;
+    ctx.fillStyle = ready ? S.color : '#3b2414cc'; ctx.strokeStyle = ready ? '#fff4dc' : '#2b1a10'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(x, y, sw, sw, 12); ctx.fill(); ctx.stroke();
+    if (!ready && !active) { ctx.fillStyle = S.glow; const f = 1 - clamp(p.spCd / (S.cd * CD_MUL), 0, 1); ctx.fillRect(x + 3, y + sw - 3 - (sw - 6) * f, sw - 6, (sw - 6) * f); }
+    const icon = IMG[S.held || S.icon || { nap: 'w_pillow', ball: 'w_ball', hug: 'w_hug', flop: 'w_wave', puppy: null, goalie: 'w_ball' }[c.special]];
+    if (icon) { ctx.globalAlpha = 0.35; const iw = sw - 14, ih = Math.min(sw - 14, iw * icon.height / icon.width); ctx.drawImage(icon, x + 7, y + 6, iw, ih); ctx.globalAlpha = 1; }
+    hudText(active && S.dur > 1 ? Math.ceil(p.spT) + 's' : S.label, x + sw / 2, y + sw / 2 + 2, isTouch ? 11 : 13, '#fff', 'center');
+    if (!isTouch) hudText('F', x + 9, y + 15, 11, '#fff4dc', 'center');
+    const tb = $('tSpecial'); if (tb) tb.style.opacity = ready ? '1' : '0.45';
   } else if (c.special === 'charge') {
     hudSlots.push({ k: 'special', x, y, w: sw });
     const ready = p.chargeCd <= 0 && p.chargeT <= 0 && p.chargeWind <= 0;
     ctx.fillStyle = ready ? '#e8742a' : '#3b2414cc'; ctx.strokeStyle = ready ? '#fff4dc' : '#2b1a10'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.roundRect(x, y, sw, sw, 12); ctx.fill(); ctx.stroke();
-    if (!ready && p.chargeT <= 0 && p.chargeWind <= 0) { ctx.fillStyle = 'rgba(255,140,60,.55)'; const f = 1 - clamp(p.chargeCd / 6, 0, 1); ctx.fillRect(x + 3, y + sw - 3 - (sw - 6) * f, sw - 6, (sw - 6) * f); }
+    if (!ready && p.chargeT <= 0 && p.chargeWind <= 0) { ctx.fillStyle = 'rgba(255,140,60,.55)'; const f = 1 - clamp(p.chargeCd / CHARGE_CD, 0, 1); ctx.fillRect(x + 3, y + sw - 3 - (sw - 6) * f, sw - 6, (sw - 6) * f); }
     hudText('CHARGE', x + sw / 2, y + sw / 2 + 2, isTouch ? 10 : 12, '#fff', 'center');
     if (!isTouch) hudText('F', x + 9, y + 15, 11, '#fff4dc', 'center');
     const tb = $('tSpecial'); if (tb) tb.style.opacity = ready ? '1' : '0.45';
@@ -3169,7 +3823,7 @@ function show(id) {
   $('touch').classList.toggle('show', isTouch && id === null && state === 'play');
   if (player) {
     const spc = CHARS[player.ch].special, tb = $('tSpecial');
-    const B = { charge: ['CHARGE', '#c9541acc'], taunt: ['ROAST', '#c0392bcc'], can: ['CANS', '#2f7fd6cc'], stomp: ['STOMP', '#7a5230cc'], slime: ['SLIME', '#3f9f1acc'], chili: ['CHILI', '#d63a1acc'] }[spc];
+    const B = { charge: ['CHARGE', '#c9541acc'], taunt: ['ROAST', '#c0392bcc'], can: ['CANS', '#2f7fd6cc'], stomp: ['STOMP', '#7a5230cc'], slime: ['SLIME', '#3f9f1acc'], chili: ['CHILI', '#d63a1acc'] }[spc] || (SP[spc] && [SP[spc].label, SP[spc].color + 'cc']);
     tb.style.display = B ? 'flex' : 'none';
     if (B) { tb.textContent = B[0]; tb.style.background = B[1]; }
   }
@@ -3312,9 +3966,9 @@ const MAX_PLAYERS = CHAR_ORDER.length;
 const r2 = v => typeof v === 'number' ? (v === Infinity ? 1e9 : Math.round(v * 100) / 100) : v;
 const unInf = v => v === 1e9 ? Infinity : v;
 const K = {
-  pl: ['id', 'ch', 'pname', 'x', 'y', 'z', 'vx', 'vy', 'hp', 'maxHp', 'dir', 'flipX', 'frame', 'face', 'aim', 'gunAng', 'bodyAng', 'cur', 'fireCd', 'lean', 'sq', 'inv', 'dead', 'deadT', 'dashT', 'dashDir', 'chargeT', 'chargeWind', 'chargeDir', 'jumpT', 'chewT', 'breathT', 'hurtT', 'victoryT', 'lastFire', 'flash', 'speech', 'macT', 'wetT'],
-  mine: ['ammo', 'bombs', 'scraps', 'canCd', 'chargeCd', 'chiliCd', 'roastCd', 'slimeCd', 'stompCd', 'stompWind', 'dashCd', 'bombCd'],
-  en: ['id', 'type', 'x', 'y', 'z', 'vx', 'vy', 'hp', 'maxHp', 'dir', 'flipX', 'frame', 'act', 'face', 'sq', 'lean', 'flash', 'spawnT', 'spawnMax', 'leap', 'st', 'seed', 'sulkT', 'hypeT', 'downT', 'downMax', 'meltT', 'burnT', 'stuckT', 'cheese', 'fvx'],
+  pl: ['id', 'ch', 'pname', 'x', 'y', 'z', 'vx', 'vy', 'hp', 'maxHp', 'dir', 'flipX', 'frame', 'face', 'aim', 'gunAng', 'bodyAng', 'cur', 'fireCd', 'lean', 'sq', 'inv', 'dead', 'deadT', 'dashT', 'dashDir', 'chargeT', 'chargeWind', 'chargeDir', 'jumpT', 'chewT', 'breathT', 'hurtT', 'victoryT', 'lastFire', 'flash', 'speech', 'macT', 'wetT', 'spT', 'spinA'],
+  mine: ['ammo', 'bombs', 'scraps', 'canCd', 'chargeCd', 'chiliCd', 'roastCd', 'slimeCd', 'stompCd', 'stompWind', 'dashCd', 'bombCd', 'spCd'],
+  en: ['id', 'type', 'x', 'y', 'z', 'vx', 'vy', 'hp', 'maxHp', 'dir', 'flipX', 'frame', 'act', 'face', 'sq', 'lean', 'flash', 'spawnT', 'spawnMax', 'leap', 'st', 'seed', 'sulkT', 'hypeT', 'downT', 'downMax', 'meltT', 'burnT', 'stuckT', 'cheese', 'fvx', 'danceT', 'sleepT', 'brawlT', 'rainbowT', 'pickT', 'signI', 'paintT', 'artI', 'paintC', 'held', 'thrownT'],
   bu: ['w', 'x', 'y', 'z', 'vx', 'vy', 'r', 'rot', 'seed', 'life', 'max'],
   eb: ['kind', 'x', 'y', 'z', 'vx', 'vy', 'r', 'rot', 'life'],
   pk: ['kind', 'x', 'y', 'z', 't', 'life', 'weapon', 'perch'],
@@ -3325,6 +3979,7 @@ const K = {
   fl: ['x', 'y', 'z', 'vx', 'vy', 'size', 'life', 'max'],
   we: ['x', 'y', 'r', 'life', 'max', 'seed'],
   pu: ['x', 'y', 'r', 'life', 'max', 'seed'],
+  gz: ['id', 'kind', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'a', 'r', 'life', 'max', 'f'],
 };
 const pack = (arr, keys) => arr.map(o => keys.map(k => r2(o[k])));
 const unpack = (rows, keys) => (rows || []).map(v => { const o = {}; keys.forEach((k, i) => (o[k] = unInf(v[i]))); return o; });
@@ -3367,7 +4022,7 @@ function buildBase() {
   return {
     t: r2(time), wave, ws: waveState, score, kills, boss: boss ? boss.id : 0, banner: banner ? { text: banner.text, sub: banner.sub, t: r2(banner.t) } : null,
     pl: pack(players, K.pl), en: pack(enemies, K.en), bu: pack(bullets, K.bu), eb: pack(ebullets, K.eb), pk: pack(pickups, K.pk), bo: pack(bombs, K.bo),
-    ro: pack(roasts, K.ro), ca: pack(cans, K.ca), ac: pack(acids, K.ac), fl: pack(flames.slice(-120), K.fl), we: pack(webs, K.we), pu: pack(puddles, K.pu),
+    ro: pack(roasts, K.ro), ca: pack(cans, K.ca), ac: pack(acids, K.ac), fl: pack(flames.slice(-120), K.fl), we: pack(webs, K.we), pu: pack(puddles, K.pu), gz: pack(gizmos, K.gz),
   };
 }
 function netHostTick(dt) {
@@ -3431,11 +4086,12 @@ function clientApply(msg) {
   enemies = next;
   boss = b.boss ? enemies.find(e => e.id === b.boss) || null : null;
   bullets = unpack(b.bu, K.bu); ebullets = unpack(b.eb, K.eb); pickups = unpack(b.pk, K.pk); bombs = unpack(b.bo, K.bo);
-  roasts = unpack(b.ro, K.ro); cans = unpack(b.ca, K.ca); acids = unpack(b.ac, K.ac); flames = unpack(b.fl, K.fl); webs = unpack(b.we, K.we); puddles = unpack(b.pu, K.pu);
+  roasts = unpack(b.ro, K.ro); cans = unpack(b.ca, K.ca); acids = unpack(b.ac, K.ac); flames = unpack(b.fl, K.fl); webs = unpack(b.we, K.we); puddles = unpack(b.pu, K.pu); gizmos = unpack(b.gz, K.gz);
   for (const [type, d] of msg.ev || []) {
     if (type === 'f') floaters.push({ x: d[0], y: d[1], text: d[2], color: d[3], life: d[4], max: d[4], size: d[5] });
     else if (type === 's') playSfx(d[0], d.slice(1));
-    else if (type === 'k') deathBurst(d[0], d[1], d[2], d[3]);
+    else if (type === 'k') { if (d[4] === 1) confettiBurst(d[0], d[1], d[2]); else { if (d[4] === 2) artShatter(d[0], d[1], d[2]); deathBurst(d[0], d[1], d[2], d[3]); } }
+    else if (type === 'a') artShatter(d[0], d[1], d[2]);
     else if (type === 'c') corpses.push({ name: d[0], row: d[1], frame: d[2], h: d[3], x: d[4], y: d[5], z: d[6], vx: d[7], vy: d[8], vz: d[9], rot: 0, vrot: d[10], flip: d[11], life: d[12], max: d[12], mass: d[13], r: d[14] });
     else if (type === 'x') { if (d === 'hurt') { shake = Math.max(shake, 10); SfxRaw.hurt(); } if (d === 'down') { shake = 18; SfxRaw.over(); } }
   }
@@ -3492,11 +4148,12 @@ function clientUpdate(dt) {
   // everyone else glides toward their latest snapshot position; shots keep flying between snapshots
   const k = 1 - Math.exp(-dt * 14);
   for (const q of players) if (q !== me && q.hx != null) { q.x = lerp(q.x, q.hx, k); q.y = lerp(q.y, q.hy, k); q.stride = (q.stride || 0) + Math.hypot(q.vx, q.vy) * dt; }
-  for (const e of enemies) { if (e.hx != null) { e.x = lerp(e.x, e.hx, k); e.y = lerp(e.y, e.hy, k); e.z = lerp(e.z, e.hz, k); } e.t = (e.t || 0) + dt; }
+  for (const e of enemies) { if (e.hx != null) { const kk = e.held || e.thrownT > 0 ? 1 : k; e.x = lerp(e.x, e.hx, kk); e.y = lerp(e.y, e.hy, kk); e.z = lerp(e.z, e.hz, kk); } e.t = (e.t || 0) + dt; }
   for (const b of bullets) { b.x += b.vx * dt; b.y += b.vy * dt; b.rot += dt * 18; }
   for (const b of ebullets) { b.x += b.vx * dt; b.y += b.vy * dt; }
   for (const b of bombs) { b.x += b.vx * dt; b.y += b.vy * dt; b.vz -= (b.g || 0) * dt; b.z = Math.max(0, b.z + b.vz * dt); }
   for (const it of pickups) it.t += dt;
+  for (const g of gizmos) { g.a += dt; if (g.kind === 'ball' || g.kind === 'pup' || g.kind === 'paint') { g.x += (g.vx || 0) * dt; g.y += (g.vy || 0) * dt; } if (g.kind === 'wave') { g.life -= dt; g.r = 40 + (1 - g.life / g.max) * 200; } if (g.kind === 'vibes' || g.kind === 'gwave') g.life -= dt; }
   // purely cosmetic systems run locally
   updateFire(dt);
   if (yardSpr) updateYard(dt);
