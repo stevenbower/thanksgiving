@@ -18,7 +18,8 @@
     padding:16px; text-align:center; z-index:10; overflow-y:auto; }
   .screen.show { display:flex; }
   h1,h2,.lilita { font-family:'Lilita One',cursive; font-weight:400; letter-spacing:1px; margin:0; }
-  #title { background:#2b1a10 center/cover no-repeat; justify-content:flex-start; padding-top:max(4vh,16px); }
+  #title { background:#2b1a10 url('assets/title.jpg?v=4') center/cover no-repeat; justify-content:flex-start; padding-top:max(4vh,16px); }
+  @media (orientation: portrait) and (max-aspect-ratio: 4/5) { #title { background-image:url('assets/title_tall.jpg?v=4'); } }
   #title::before { content:''; position:absolute; inset:0; background:linear-gradient(#0008 0%, #0000 35%, #0000 65%, #000a 100%); pointer-events:none; }
   #title > * { position:relative; }
   #title h1 { font-size:clamp(40px,9vw,96px); color:var(--gold); line-height:.95;
@@ -236,6 +237,6 @@
 
 <script type="module" src="/src/main.js"></script>
 <script src="assets/anim.js?v=14"></script>
-<script src="game.js?v=58"></script>
+<script src="game.js?v=60"></script>
 </body>
 </html>

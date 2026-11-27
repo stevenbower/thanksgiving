@@ -345,6 +345,9 @@ let fireHeld = false, fireTouch = null;
 // ---------- game state ----------
 let state = 'title';
 let selected = store.get('tg_char', 'pops'); // first-time default: Steve
+// the character lists put whoever you played most recently first, pushing the rest down
+function charOrder() { const mru = store.get('tg_mru', []).filter(k => CHARS[k]); return [...mru, ...CHAR_ORDER.filter(k => !mru.includes(k))]; }
+function bumpChar(k) { if (!CHARS[k]) return; const mru = store.get('tg_mru', []).filter(x => x !== k && CHARS[x]); mru.unshift(k); store.set('tg_mru', mru); }
 const names = Object.fromEntries(CHAR_ORDER.map(k => [k, CHARS[k].name])); // fixed names (renaming was removed)
 let tableT = 8, corpses = [], webs = [], roasts = [], cans = [], acids = [], flames = [];
 // player = the player currently being simulated/drawn (the "actor"); me = this device's player; players = everyone
@@ -3834,7 +3837,7 @@ function show(id) {
 function buildCards() {
   $('pnameSel').value = playerName();
   const wrap = $('cards'); wrap.innerHTML = '';
-  for (const k of CHAR_ORDER) {
+  for (const k of charOrder()) {
     const c = CHARS[k];
     const el = document.createElement('div');
     el.className = 'card' + (k === selected ? ' sel' : '');
@@ -3851,6 +3854,7 @@ function buildCards() {
 
 function startGame() {
   const nm = $('pnameSel').value.trim(); if (nm) setPlayerName(nm);
+  bumpChar(selected);
   Sfx.unlock();
   document.activeElement && document.activeElement.blur && document.activeElement.blur();
   sticks.move = sticks.aim = null;
@@ -3953,7 +3957,6 @@ function refreshTitle() {
 $('ctrlHint').textContent = isTouch
   ? 'Left thumb moves · Right thumb aims & fires (or let it auto-fire) · Tap the bomb to throw stuffing'
   : 'WASD move · Mouse aim · Click fire · Space stuffing bomb · Shift dash · Q/E or 1–4 swap weapons · F special · T auto-aim · R auto-fire';
-$('title').style.backgroundImage = "url('assets/title.jpg')";
 refreshTitle();
 
 // ======================================================================================
@@ -4237,7 +4240,7 @@ function renderLobby() {
     list.appendChild(li);
   }
   const wrap = $('lobbyCards'); wrap.innerHTML = '';
-  for (const k of CHAR_ORDER) {
+  for (const k of charOrder()) {
     const owner = NET.roster.find(x => x.ch === k), mine = owner && owner.id === myId;
     const el = document.createElement('div'); el.className = 'lcard' + (mine ? ' sel' : owner ? ' taken' : '');
     el.innerHTML = `<img src="assets/${k}.png" alt=""><div class="cn"></div><div class="by"></div>`;
@@ -4256,6 +4259,7 @@ function renderLobby() {
 }
 function beginNetGame(level) {
   testLevel = level || 0;
+  const mine = NET.roster.find(r => r.id === NET.room.id); if (mine) bumpChar(mine.ch);
   const roster = NET.roster.map(r => ({ id: r.id, name: r.name, ch: r.ch }));
   Sfx.unlock();
   sticks.move = sticks.aim = null;
