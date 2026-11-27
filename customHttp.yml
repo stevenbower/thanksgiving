@@ -1,0 +1,14 @@
+customHeaders:
+  # always fetch the newest page so phones never run a stale copy pointing at old code
+  - pattern: '/'
+    headers:
+      - key: Cache-Control
+        value: no-cache
+  - pattern: '/index.html'
+    headers:
+      - key: Cache-Control
+        value: no-cache
+  - pattern: '/game.js'
+    headers:
+      - key: Cache-Control
+        value: no-cache

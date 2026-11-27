@@ -1,18 +1,19 @@
 // Wires the AWS backend (when deployed) into the plain-JS game via window.TGNet.
-import { Amplify } from 'aws-amplify';
-import { generateClient } from 'aws-amplify/data';
-import { setupNet, TGNet } from './net.js';
-
-// amplify_outputs.json only exists once a backend is deployed (CI or `npx ampx sandbox`);
-// without it the game still runs single player, and ?net=local still allows multi-tab testing.
+// The heavy Amplify code loads in the background; window.TGNetLoad resolves when it's ready
+// (or rejects with the reason), so the game can wait for it instead of failing on a slow phone.
 const outputs = Object.values(import.meta.glob('../amplify_outputs.json', { eager: true, import: 'default' }))[0];
-let client = null;
-if (outputs) {
-  try {
+
+window.TGNetLoad = (async () => {
+  const { setupNet, TGNet } = await import('./net.js');
+  let client = null;
+  if (outputs) {
+    const [{ Amplify }, { generateClient }] = await Promise.all([import('aws-amplify'), import('aws-amplify/data')]);
     Amplify.configure(outputs);
     client = generateClient();
-  } catch (e) { console.warn('backend unavailable', e); }
-}
-setupNet(client);
-window.TGNet = TGNet;
-window.dispatchEvent(new Event('tgnet-ready'));
+  }
+  setupNet(client);
+  window.TGNet = TGNet;
+  window.dispatchEvent(new Event('tgnet-ready'));
+  return TGNet;
+})();
+window.TGNetLoad.catch(e => { window.TGNetError = (e && e.message) || String(e); console.warn('online features failed to load', e); });

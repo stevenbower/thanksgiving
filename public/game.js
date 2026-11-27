@@ -3874,7 +3874,7 @@ function toggleMute() { const m = Sfx.toggle(); $('muteBtn').textContent = m ? '
 function gameOver() {
   if (state === 'over') return;
   state = 'over';
-  if (NET && NET.host) { NET.room.send({ k: 'over', score, kills, wave }); TGNet.setStatus(NET.room.code, 'lobby'); }
+  if (NET && NET.host) { NET.room.send({ k: 'over', score, kills, wave }); window.TGNet.setStatus(NET.room.code, 'lobby'); }
   submitScore();
   const hiKey = NET ? 'tg_hi_multi' : 'tg_hi';
   const hi = store.get(hiKey, 0);
@@ -3913,7 +3913,7 @@ $('lobbyShare').addEventListener('click', async () => {
 function openMulti(code) {
   $('pnameMulti').value = playerName();
   if (code) $('joinCode').value = code;
-  $('multiMsg').textContent = window.TGNet && TGNet.available ? '' : 'Multiplayer needs the online version of the game.';
+  $('multiMsg').textContent = window.TGNet && !window.TGNet.available ? 'Multiplayer needs the online version of the game.' : window.TGNetError ? 'Online features failed to load. Try reloading the page.' : '';
   show('multi');
 }
 // ---------- test mode: jump straight to any level (optionally invincible) ----------
@@ -4193,7 +4193,7 @@ function netAttach(room) {
       if (state !== 'lobby' || NET.roster.length >= MAX_PLAYERS) { room.send({ k: 'reject', why: state !== 'lobby' ? 'That game has already started.' : 'That game is full.' }, id); return; }
       NET.roster.push({ id, name: String(info.name || 'Player').slice(0, 14), ch: null });
       NET.evq.set(id, []);
-      TGNet.setStatus(room.code, 'lobby', NET.roster.length);
+      window.TGNet.setStatus(room.code, 'lobby', NET.roster.length);
       setTimeout(lobbyBroadcast, 300);
     });
     room.onLeave(id => {
@@ -4272,7 +4272,7 @@ function hostStart() {
   NET.overSent = false;
   for (const r of NET.roster) if (r.id !== NET.room.id) NET.evq.set(r.id, []);
   NET.room.send({ k: 'start', roster: NET.roster, level: 0 });
-  TGNet.setStatus(NET.room.code, 'playing', NET.roster.length);
+  window.TGNet.setStatus(NET.room.code, 'playing', NET.roster.length);
   beginNetGame(0);
 }
 function netLost(why) {
@@ -4285,14 +4285,25 @@ function netLost(why) {
 function leaveNet() {
   if (!NET) return;
   const room = NET.room;
-  if (NET.host) TGNet.setStatus(room.code, 'ended');
+  if (NET.host) window.TGNet.setStatus(room.code, 'ended');
   NET = null; try { room.close(); } catch {}
+}
+// the online code loads in the background; wait for it (a slow phone may still be fetching it)
+async function onlineNet() {
+  if (window.TGNet) return window.TGNet;
+  if (window.TGNetError) throw new Error('Online features failed to load: ' + window.TGNetError + '. Try reloading the page.');
+  if (!window.TGNetLoad) throw new Error('Online features failed to load. Try reloading the page.');
+  $('multiMsg').textContent = 'Loading online features…';
+  const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Still loading online features. Check your connection and try again.')), 60000));
+  return Promise.race([window.TGNetLoad, timeout]);
 }
 async function hostGame() {
   const name = $('pnameMulti').value.trim(); if (!name) { $('multiMsg').textContent = 'Enter your name first.'; $('pnameMulti').focus(); return; }
   setPlayerName(name);
   $('multiMsg').textContent = 'Creating a game…';
   try {
+    const TGNet = await onlineNet();
+    $('multiMsg').textContent = 'Creating a game…';
     const room = await TGNet.createGame(name);
     netAttach(room); state = 'lobby'; show('lobby'); renderLobby(); $('multiMsg').textContent = '';
   } catch (e) { $('multiMsg').textContent = e.message || String(e); }
@@ -4303,6 +4314,8 @@ async function joinGame() {
   const code = $('joinCode').value;
   $('multiMsg').textContent = 'Joining…';
   try {
+    const TGNet = await onlineNet();
+    $('multiMsg').textContent = 'Joining…';
     const room = await TGNet.joinGame(code, name);
     netAttach(room);
     // wait for the host to let us in
@@ -4321,14 +4334,15 @@ function submitScore() {
   if (NET && !NET.host) return;  // the host posts the team's score
   if (score <= 0) return;
   const list = players.map(q => `${q.pname || 'Player'} (${CHARS[q.ch].name})`).join(', ');
-  window.TGNet && TGNet.submitScore({ mode: NET ? 'multi' : 'single', score: Math.round(score), names: list, level: wave, kills, players: players.length });
+  window.TGNet && window.TGNet.submitScore({ mode: NET ? 'multi' : 'single', score: Math.round(score), names: list, level: wave, kills, players: players.length });
 }
 async function showScores(mode) {
   show('scores');
   for (const b of document.querySelectorAll('#scoreTabs button')) b.classList.toggle('on', b.dataset.mode === mode);
   const box = $('scoreList'); box.innerHTML = '<div class="hint">Loading…</div>';
-  if (!window.TGNet || !TGNet.available) { box.innerHTML = '<div class="hint">High scores need the online version of the game.</div>'; return; }
   try {
+    const TGNet = await onlineNet();
+    if (!TGNet.available) { box.innerHTML = '<div class="hint">High scores need the online version of the game.</div>'; return; }
     const rows = await TGNet.topScores(mode, 15);
     box.innerHTML = rows.length ? '' : '<div class="hint">No scores yet. Be the first!</div>';
     rows.forEach((r, i) => {
