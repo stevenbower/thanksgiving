@@ -46,7 +46,7 @@ const CHARS = {
   grandma:   { name:'Grandma',      role:'Pie Commander',   hp:120, speed:250, perk:'Starts with a stack of Pie Frisbees. Pie slices heal double.', startPie:20, healMul:2 },
   teen:      { name:'Eli',          role:'Junkyard Inventor', hp:100, speed:265, perk:'Picks up junk scraps. Collect 5 and he builds a Mac & Cheese Blaster that traps enemies in sticky cheese webs for 10s!', rateMul:0.85, startCorn:250, special:'scrap' },
   kidred:    { name:'Issac',        role:'Human Cannonball', hp:85,  speed:315, perk:'Super speedy. SPECIAL: winds up, then charges like crazy, smashing through enemy after enemy!', dashCd:0.45, special:'charge' },
-  kidstripe: { name:'Ben',          role:'Trash Talker',    hp:90,  speed:290, perk:'Starts with 6 Stuffing Bombs with bigger blasts, and roasts every enemy he takes out.', bombs:6, bombMul:1.5, special:'taunt' },
+  kidstripe: { name:'Ben',          role:'Trash Talker',    hp:90,  speed:290, perk:'Bigger Stuffing Bombs and a big mouth. SPECIAL: hurls insults so mean they hurt, and enemies run away crying!', bombs:6, bombMul:1.5, special:'taunt' },
 };
 const CHAR_ORDER = ['grandpa','grandma','teen','kidred','kidstripe'];
 
@@ -70,6 +70,7 @@ const ENEMIES = {
 };
 
 const ARENA = { w: 2400, h: 1600 };
+const ROAST_CD = 4.5;
 
 // Ben's trash talk: rude, but kid-friendly
 const TAUNTS = {
@@ -84,6 +85,14 @@ const TAUNTS = {
   cranberry: ['Jelly belly jerk!', 'Splat! Stay in the can!', 'Wobble wobble, loser!'],
   boss: ['WHO\'S THE TURKEY NOW, BIG BABY?!', 'Gobble-ZILLA? More like Gobble-LOSER!', 'Bye-bye, giant butterball!'],
 };
+// insults Ben physically hurls: short enough to fly as a word
+const INSULTS = {
+  any: ['LOSER!', 'DORK!', 'DWEEB!', 'NERD!', 'STINKY!', 'DUMMY!', 'GOOBER!', 'LAME-O!', 'BUTT-FACE!', 'WIMP!', 'DOOFUS!', 'BOZO!', 'SLOWPOKE!', 'POOPHEAD!', 'NINCOMPOOP!', 'BIG BABY!', 'SMELLY!'],
+  turkey: ['BIRDBRAIN!', 'FEATHERBUTT!', 'BUTTERBALL!'], potato: ['SPUD-FACE!', 'TATER BRAIN!', 'COUCH POTATO!'], tot: ['TINY TOT!', 'BABY SPUD!'],
+  corn: ['CORN-HEAD!', 'COB-LOSER!'], pumpkin: ['PUMPKIN BUTT!', 'BIG HEAD!'], cranberry: ['JELLY BELLY!', 'WOBBLE-BUTT!'], boss: ['GOBBLE-LOSER!', 'GIANT DORK!', 'MEGA BABY!'],
+};
+const ROAST_SHOUTS = ['Hey losers, CATCH!', 'Roast time, nerds!', 'Take THIS, dorks!', 'Say it to my FACE!', 'Words HURT, dummies!', 'Incoming insults!', 'You\'re all LAME!'];
+const CRY = ['WAAAH!', 'Mommy!', '*sniff*', 'So mean!', 'Rude!!', 'WAH!'];
 const POW = ['POW!', 'BAM!', 'WHAM!', 'KAPOW!', 'BONK!', 'SMACK!', 'BOOM!'];
 
 
@@ -171,6 +180,7 @@ const Sfx = (() => {
     windup() { tone({ f: 150, f2: 900, type: 'sawtooth', dur: 0.55, vol: 0.12 }); tone({ f: 300, f2: 1800, type: 'square', dur: 0.55, vol: 0.04 }); },
     clank() { tone({ f: 1200, f2: 600, type: 'square', dur: 0.06, vol: 0.08 }); tone({ f: 1800, f2: 900, type: 'triangle', dur: 0.1, vol: 0.06, delay: 0.04 }); },
     assemble() { [300, 420, 300, 520].forEach((f, i) => tone({ f, f2: f * 0.6, type: 'square', dur: 0.06, vol: 0.09, delay: i * 0.07 })); [523, 659, 784, 1046, 1318].forEach((f, i) => tone({ f, type: 'triangle', dur: 0.14, vol: 0.12, delay: 0.32 + i * 0.07 })); },
+    roast() { tone({ f: 220, f2: 520, type: 'sawtooth', dur: 0.18, vol: 0.09 }); [0, 1, 2, 3].forEach(i => tone({ f: rand(600, 1000), f2: rand(300, 1400), type: 'square', dur: 0.07, vol: 0.06, delay: 0.08 + i * 0.06 })); tone({ f: 900, f2: 200, type: 'triangle', dur: 0.3, vol: 0.08, delay: 0.1 }); },
     taunt() { if (throttle('taunt', 300)) return; [0, 1, 2].forEach(i => tone({ f: rand(500, 900), f2: rand(400, 1100), type: 'square', dur: 0.06, vol: 0.05, delay: i * 0.07 })); },
     pickup() { [660, 880, 1320].forEach((f, i) => tone({ f, type: 'square', dur: 0.08, vol: 0.08, delay: i * 0.06 })); },
     heal() { [523, 659, 784, 1046].forEach((f, i) => tone({ f, type: 'triangle', dur: 0.12, vol: 0.12, delay: i * 0.07 })); },
@@ -275,7 +285,7 @@ let selected = store.get('tg_char', 'grandpa');
 const OLD_DEFAULTS = ['Grandpa', 'The Professor', 'Cheeto Kid', "Lil' Stripes"];
 const names = Object.assign({}, ...CHAR_ORDER.map(k => ({ [k]: CHARS[k].name })),
   Object.fromEntries(Object.entries(store.get('tg_names', {})).filter(([, v]) => !OLD_DEFAULTS.includes(v))));
-let corpses = [], webs = [];
+let corpses = [], webs = [], roasts = [];
 let player, enemies, bullets, ebullets, bombs, particles, puddles, pickups, floaters, props, spawnQueue;
 let wave, waveState, waveTimer, score, kills, shake, time, banner, boss, hitStop;
 const cam = { x: ARENA.w / 2, y: ARENA.h / 2 };
@@ -292,9 +302,9 @@ function newGame() {
     // animation / body dynamics
     dir: 'front', flipX: false, dirHold: 0, stride: 0, frame: 1, lastFrame: 1, bodyAng: Math.PI / 2,
     lastFire: 9, lean: 0, leanV: 0, sq: 0, sqV: 0, hurtT: 0, victoryT: 0, dead: false, deadT: 0, gunAng: Math.PI / 2,
-    scraps: 0, macT: 0, prevWeapon: 'gravy', chargeCd: 0, chargeWind: 0, chargeT: 0, chargeDir: [1, 0], chargeTarget: null, lastTaunt: -9, speech: null,
+    scraps: 0, macT: 0, prevWeapon: 'gravy', chargeCd: 0, chargeWind: 0, chargeT: 0, chargeDir: [1, 0], chargeTarget: null, lastTaunt: -9, speech: null, roastCd: 0, roastFlash: 0,
   };
-  enemies = []; bullets = []; ebullets = []; bombs = []; particles = []; puddles = []; pickups = []; floaters = []; corpses = []; webs = [];
+  enemies = []; bullets = []; ebullets = []; bombs = []; particles = []; puddles = []; pickups = []; floaters = []; corpses = []; webs = []; roasts = [];
   spawnQueue = []; wave = Math.max(0, (parseInt(new URLSearchParams(location.search).get('wave')) || 1) - 1); score = 0; kills = 0; shake = 0; time = 0; banner = null; boss = null; hitStop = 0;
   props = makeProps();
   cam.x = player.x; cam.y = player.y;
@@ -385,6 +395,7 @@ function update(dt) {
   updatePlayer(dt);
   updateEnemies(dt);
   updateBullets(dt);
+  updateRoasts(dt);
   updateBombs(dt);
   updateMisc(dt);
   // camera
@@ -523,6 +534,9 @@ function updatePlayer(dt) {
   if (wantSpecial && c.special === 'charge' && p.chargeCd <= 0 && p.chargeT <= 0 && p.chargeWind <= 0) {
     p.chargeWind = 0.55; Sfx.windup();
   }
+  // ----- Ben: hurl insults so mean they physically hurt -----
+  if (wantSpecial && c.special === 'taunt' && p.roastCd <= 0 && !p.dead) hurlInsults(p);
+  p.roastCd -= dt; p.roastFlash -= dt;
   wantSpecial = false;
   p.chargeCd -= dt;
   if (p.chargeWind > 0) {
@@ -852,6 +866,13 @@ function updateEnemies(dt) {
 
     // stagger: a hit interrupts control briefly
     if (e.hurtT > 0) { dvx = 0; dvy = 0; accel *= 0.35; act = 0; if (e.st === 'wind' || e.st === 'aim') e.st = 'move'; }
+    // roasted by Ben: too upset to fight, runs away bawling
+    if (e.sulkT > 0) {
+      e.sulkT -= dt;
+      dvx = -nx * sp * 0.85; dvy = -ny * sp * 0.85; act = null;
+      if (e.st !== 'move' && e.st !== 'land') e.st = 'move';
+      if (Math.random() < dt * 14) for (const sd of [-1, 1]) particles.push({ x: e.x + sd * e.r * 0.35, y: e.y, z: e.h * 0.72, vx: sd * rand(40, 90), vy: rand(-10, 10), vz: rand(80, 160), life: 0.6, max: 0.6, color: '#7fd4ff', size: rand(3, 5), grav: 700 });
+    }
     // sticky cheese webs: walking into one glues you in place for a bit
     if ((e.stuckT || 0) <= 0 && (e.webCd || 0) < time && e.z < 10) {
       for (const w of webs) if ((e.x - w.x) ** 2 + ((e.y - w.y) * 1.6) ** 2 < w.r * w.r) { webEnemy(e, e.type === 'boss' ? 0.5 : e.d.heavy ? 1 : 1.6); break; }
@@ -900,7 +921,7 @@ function updateEnemies(dt) {
     e.face = dx > 0 ? 1 : -1;
 
     // contact damage
-    if (dist < e.r + p.r && e.z < 30 && p.inv <= 0 && !p.dead) {
+    if (dist < e.r + p.r && e.z < 30 && p.inv <= 0 && !p.dead && !(e.sulkT > 0)) {
       hurtPlayer(d.dmg * (e.st === 'dash' || e.st === 'lunge' ? 1.4 : 1), nx, ny);
     }
   }
@@ -1026,6 +1047,82 @@ function killEnemy(e) {
     player.speech = { text: line, t: 1.9, max: 1.9 }; player.lastTaunt = time;
     Sfx.taunt();
   }
+}
+
+function hurlInsults(p) {
+  p.roastCd = ROAST_CD; p.roastFlash = 0.35;
+  const vis = enemies.filter(e => !e.dead && e.spawnT <= 0 && onScreen(e, 0)).sort((a, b) => ((a.x - p.x) ** 2 + (a.y - p.y) ** 2) - ((b.x - p.x) ** 2 + (b.y - p.y) ** 2));
+  const targets = vis.slice(0, 4);
+  const n = Math.max(3, targets.length);
+  for (let i = 0; i < n; i++) {
+    const t = targets.length ? targets[i % targets.length] : null;
+    const base = t ? Math.atan2(t.y - p.y, t.x - p.x) : p.aim;
+    const a = base + (i - (n - 1) / 2) * 0.35;
+    const pool = t && INSULTS[t.type] && Math.random() < 0.5 ? INSULTS[t.type] : INSULTS.any;
+    roasts.push({ x: p.x + Math.cos(a) * 20, y: p.y + Math.sin(a) * 12, z: p.h * 0.75, vx: Math.cos(a) * 300, vy: Math.sin(a) * 300, target: t, text: pick(pool),
+      life: 1.8, max: 1.8, delay: i * 0.08, rot: rand(-0.3, 0.3), vrot: rand(-3, 3), wob: rand(0, 6) });
+  }
+  p.speech = { text: pick(ROAST_SHOUTS), t: 1.4, max: 1.4 }; p.lastTaunt = time;
+  p.sq = -0.25; p.sqV = 0; // rears back to yell
+  p.vx -= Math.cos(p.aim) * 60; p.vy -= Math.sin(p.aim) * 60;
+  shake = Math.max(shake, 4);
+  Sfx.roast();
+}
+
+function updateRoasts(dt) {
+  for (const r of roasts) {
+    if (r.delay > 0) { r.delay -= dt; continue; }
+    r.life -= dt; r.rot += r.vrot * dt; r.vrot *= Math.exp(-dt * 2);
+    let t = r.target;
+    if (!t || t.dead) t = r.target = nearestEnemy(r.x, r.y, 600, null);
+    const sp = Math.hypot(r.vx, r.vy) || 1, nsp = Math.min(680, sp + 650 * dt);
+    let a = Math.atan2(r.vy, r.vx);
+    if (t) a += clamp(angDiff(a, Math.atan2(t.y - r.y, t.x - r.x)), -8 * dt, 8 * dt);
+    r.vx = Math.cos(a) * nsp; r.vy = Math.sin(a) * nsp;
+    r.x += r.vx * dt; r.y += r.vy * dt;
+    r.z = lerp(r.z, t ? t.h * 0.55 : 30, 1 - Math.exp(-dt * 4));
+    if (r.x < 0 || r.x > ARENA.w || r.y < 0 || r.y > ARENA.h) { r.life = 0; continue; }
+    for (const e of enemies) {
+      if (e.dead || e.spawnT > 0) continue;
+      const rr = e.r + 22;
+      if ((e.x - r.x) ** 2 + ((e.y - r.y) * 1.2) ** 2 < rr * rr) {
+        r.life = 0;
+        const k = Math.hypot(r.vx, r.vy) || 1;
+        damageEnemy(e, 28 + wave * 3, r.vx / k, r.vy / k, 320);
+        if (!e.dead) {
+          e.sulkT = Math.max(e.sulkT || 0, e.type === 'boss' ? 0.9 : e.d.heavy ? 1.8 : 2.8);
+          e.st = 'move';
+          floatText(e.x, e.y - e.h - 30, pick(CRY), '#7fd4ff', 1.0, 20);
+        }
+        hitStop = Math.max(hitStop, 0.02); shake = Math.max(shake, 5);
+        for (let i = 0; i < 10; i++) particles.push({ x: r.x, y: r.y, z: r.z, vx: rand(-220, 220), vy: rand(-150, 150), vz: rand(80, 280), life: 0.45, max: 0.45, color: pick(['#c0392b', '#ffffff', '#ffd84a']), size: rand(3, 7), grav: 600 });
+        Sfx.hit();
+        break;
+      }
+    }
+  }
+  roasts = roasts.filter(r => r.life > 0);
+}
+
+function drawRoast(r) {
+  if (r.delay > 0) return;
+  const age = r.max - r.life, pop = age < 0.12 ? 0.5 + age / 0.12 * 0.7 : 1.2 - Math.min(0.2, (age - 0.12));
+  ctx.font = "24px 'Lilita One', sans-serif";
+  const w = ctx.measureText(r.text).width * pop;
+  // speed streaks behind the word
+  const k = Math.hypot(r.vx, r.vy) || 1, ux = -r.vx / k, uy = -r.vy / k;
+  ctx.save(); ctx.globalAlpha = 0.55; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (let i = -1; i <= 1; i++) { const ox = -uy * i * 9, oy = ux * i * 9; ctx.beginPath(); ctx.moveTo(r.x + ux * (w * 0.4) + ox, r.y - r.z + uy * (w * 0.4) + oy); ctx.lineTo(r.x + ux * (w * 0.4 + 26 - Math.abs(i) * 8) + ox, r.y - r.z + uy * (w * 0.4 + 26 - Math.abs(i) * 8) + oy); ctx.stroke(); }
+  ctx.restore();
+  ctx.save();
+  ctx.translate(r.x, r.y - r.z);
+  ctx.rotate(r.rot + Math.sin(age * 14 + r.wob) * 0.08);
+  ctx.scale(pop, pop);
+  ctx.font = "24px 'Lilita One', sans-serif"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  ctx.lineWidth = 7; ctx.strokeStyle = '#2b1a10'; ctx.strokeText(r.text, 0, 0);
+  ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.strokeText(r.text, 0, 0);
+  ctx.fillStyle = '#e8322a'; ctx.fillText(r.text, 0, 0);
+  ctx.restore();
 }
 
 function assembleMac() {
@@ -1420,6 +1517,7 @@ function render() {
   list.push([player.y, drawPlayer]);
   for (const it of pickups) list.push([it.y, () => drawPickup(it)]);
   for (const b of bullets) list.push([b.y, () => drawBullet(b)]);
+  for (const r of roasts) list.push([r.y, () => drawRoast(r)]);
   for (const b of ebullets) list.push([b.y, () => drawEBullet(b)]);
   for (const b of bombs) list.push([b.y, () => drawSprite('w_bomb', b.x, b.y - b.z + 18, 38, false, { rot: b.rot })]);
   for (const pt of particles) if (!pt.smoke && !pt.ring) list.push([pt.y, () => drawParticle(pt)]);
@@ -1470,7 +1568,7 @@ function drawEnemy(e) {
   if (d.ai === 'hop') { row = 'hop'; frame = e.act ?? 0; }
   else if (e.act !== null && e.act !== undefined && A && A.rows.act !== undefined) { row = 'act'; frame = e.act; }
   // charging wind-up shiver
-  const shiver = (e.st === 'wind' || e.st === 'aim') ? Math.sin(e.t * 70) * 2 : e.stuckT > 0 ? Math.sin(e.t * 40) * 2.5 : 0;
+  const shiver = (e.st === 'wind' || e.st === 'aim') ? Math.sin(e.t * 70) * 2 : e.stuckT > 0 ? Math.sin(e.t * 40) * 2.5 : e.sulkT > 0 ? Math.sin(e.t * 30) * 1.5 : 0;
   const ok = drawAnim(name, row, frame, e.x + shiver, e.y - e.z, e.h, e.flipX, { sx: ssx, sy: ssy, rot: e.lean, flash: e.flash, alpha });
   if (!ok) drawSprite(name, e.x, e.y - e.z, e.h, e.face !== d.face, { sx: ssx, sy: ssy, rot: e.lean, flash: e.flash, alpha });
   if (e.stuckT > 0) drawCheeseWeb(e);
@@ -1682,6 +1780,15 @@ function drawHUD() {
       hudText(`${p.scraps}/5`, x + sw / 2, y + sw - 5, 13, '#fff', 'center');
       for (let i = 0; i < 5; i++) { ctx.fillStyle = i < p.scraps ? '#cfd8dc' : '#2b1a10aa'; ctx.fillRect(x + 4 + i * (sw - 8) / 5, y + sw + 3, (sw - 8) / 5 - 2, 5); }
     }
+  } else if (c.special === 'taunt') {
+    hudSlots.push({ k: 'special', x, y, w: sw });
+    const ready = p.roastCd <= 0;
+    ctx.fillStyle = ready ? '#c0392b' : '#3b2414cc'; ctx.strokeStyle = ready ? '#fff4dc' : '#2b1a10'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(x, y, sw, sw, 12); ctx.fill(); ctx.stroke();
+    if (!ready) { ctx.fillStyle = 'rgba(230,70,50,.55)'; const f = 1 - clamp(p.roastCd / ROAST_CD, 0, 1); ctx.fillRect(x + 3, y + sw - 3 - (sw - 6) * f, sw - 6, (sw - 6) * f); }
+    hudText('ROAST', x + sw / 2, y + sw / 2 + 2, isTouch ? 11 : 13, '#fff', 'center');
+    if (!isTouch) hudText('F', x + 9, y + 15, 11, '#fff4dc', 'center');
+    const tb = $('tSpecial'); if (tb) tb.style.opacity = ready ? '1' : '0.45';
   } else if (c.special === 'charge') {
     hudSlots.push({ k: 'special', x, y, w: sw });
     const ready = p.chargeCd <= 0 && p.chargeT <= 0 && p.chargeWind <= 0;
@@ -1744,7 +1851,12 @@ function drawSticks() {
 function show(id) {
   for (const s of document.querySelectorAll('.screen')) s.classList.toggle('show', s.id === id);
   $('touch').classList.toggle('show', isTouch && id === null && state === 'play');
-  if (player) $('tSpecial').style.display = CHARS[player.ch].special === 'charge' ? 'flex' : 'none';
+  if (player) {
+    const spc = CHARS[player.ch].special, tb = $('tSpecial');
+    tb.style.display = spc === 'charge' || spc === 'taunt' ? 'flex' : 'none';
+    tb.textContent = spc === 'taunt' ? 'ROAST' : 'CHARGE';
+    tb.style.background = spc === 'taunt' ? '#c0392bcc' : '#c9541acc';
+  }
   $('pauseBtn').style.display = state === 'play' ? 'flex' : 'none';
 }
 
@@ -1828,6 +1940,6 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-if (new URLSearchParams(location.search).has('debug')) window.__tg = { fn: { assembleMac: () => assembleMac(), spawn: (t, x, y) => spawnEnemy(t, x, y), drop: (x, y, k) => dropPickup(x, y, k) }, get s() { return { state, wave, score, kills, player, cam, ZOOM, enemies: enemies && enemies.map(e => [e.type, Math.round(e.x), Math.round(e.y), e.spawnT]), bullets: bullets && bullets.length }; } };
+if (new URLSearchParams(location.search).has('debug')) window.__tg = { fn: { assembleMac: () => assembleMac(), spawn: (t, x, y) => spawnEnemy(t, x, y), drop: (x, y, k) => dropPickup(x, y, k) }, get s() { return { state, wave, score, kills, player, cam, ZOOM, enemies: enemies && enemies.map(e => [e.type, Math.round(e.x), Math.round(e.y), e.spawnT, Math.round(e.hp), +(e.sulkT || 0).toFixed(1)]), bullets: bullets && bullets.length }; } };
 loadAssets().then(() => { buildFloor(); requestAnimationFrame(frame); });
 })();
