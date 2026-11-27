@@ -190,5 +190,77 @@ window.ANIM = {
   "n": {
    "hop": 4
   }
+ },
+ "mama": {
+  "cw": 188,
+  "ch": 206,
+  "ax": 113.9,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "pops": {
+  "cw": 209,
+  "ch": 206,
+  "ax": 133.2,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "michelle": {
+  "cw": 204,
+  "ch": 206,
+  "ax": 84.1,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
+ },
+ "arthur": {
+  "cw": 216,
+  "ch": 206,
+  "ax": 112.4,
+  "ref": 180,
+  "rows": {
+   "front": 0,
+   "side": 1,
+   "back": 2,
+   "act": 3
+  },
+  "n": {
+   "front": 4,
+   "side": 4,
+   "back": 4,
+   "act": 4
+  }
  }
 };
