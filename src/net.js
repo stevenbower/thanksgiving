@@ -11,6 +11,9 @@
 
 const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
 const DIRECT_TIMEOUT = 7000;
+const DROP_AFTER = 30000;   // no word from a peer for this long -> they're gone
+// one id per browser tab that survives reloads and reconnects, so a player can never show up twice
+const tabId = () => { try { let v = sessionStorage.getItem('tg_cid'); if (!v) { v = uid(); sessionStorage.setItem('tg_cid', v); } return v; } catch { return uid(); } };
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -46,16 +49,22 @@ function amplifyBackend(client) {
     async updateGame(code, patch) { await client.models.Game.update({ code, ...patch }); },
     channel(code, onMsg) {
       let resolveReady; const ready = new Promise(r => (resolveReady = r));
-      const sub = client.subscriptions.receive({ code }, { authMode: 'apiKey' }).subscribe({
-        next: m => onMsg({ from: m.from, to: m.to, kind: m.kind, data: m.data ? JSON.parse(m.data) : null }),
-        error: e => console.warn('channel error', e),
-      });
+      let sub = null, closed = false;
+      // (re)subscribe; if the socket drops (network change, phone sleeping) come right back
+      const connect = () => {
+        if (closed) return;
+        sub = client.subscriptions.receive({ code }, { authMode: 'apiKey' }).subscribe({
+          next: m => onMsg({ from: m.from, to: m.to, kind: m.kind, data: m.data ? JSON.parse(m.data) : null }),
+          error: e => { console.warn('channel error, reconnecting', e); setTimeout(connect, 1500); },
+        });
+      };
+      connect();
       // AppSync needs a moment after subscribing before it delivers; give it a beat
       setTimeout(resolveReady, 1200);
       return {
         ready,
         publish: m => client.mutations.publish({ code, from: m.from, to: m.to || null, kind: m.kind, data: m.data == null ? null : JSON.stringify(m.data) }, { authMode: 'apiKey' }).catch(e => console.warn('publish failed', e)),
-        close: () => sub.unsubscribe(),
+        close: () => { closed = true; try { sub && sub.unsubscribe(); } catch {} },
       };
     },
     async submitScore(s) { await client.models.Score.create(s); },
@@ -70,13 +79,17 @@ function amplifyBackend(client) {
 class Room {
   constructor(backend, code, isHost, name) {
     this.backend = backend; this.code = code; this.isHost = isHost; this.name = name;
-    this.id = uid(); this.hostId = isHost ? this.id : null;
+    this.id = tabId(); this.hostId = isHost ? this.id : null;
     this.peers = new Map(); // id -> { pc, r, u, relay, open, lastSeen }
     this.handlers = []; this.leaveHandlers = []; this.joinHandlers = [];
     this.forceRelay = new URLSearchParams(location.search).has('relay');
     this.closed = false;
     this.chan = backend.channel(code, m => this._onChan(m));
+    this.lastBeat = Date.now();
     this.heart = setInterval(() => this._heartbeat(), 2000);
+    // back from the lock screen / another app: don't count the time away against anyone, and say hi
+    this.onVis = () => { if (document.visibilityState === 'visible') this._resume(); };
+    document.addEventListener('visibilitychange', this.onVis);
   }
   on(fn) { this.handlers.push(fn); }
   onLeave(fn) { this.leaveHandlers.push(fn); }
@@ -99,13 +112,27 @@ class Room {
 
   async start() {
     await this.chan.ready;
-    if (!this.isHost) this.chan.publish({ from: this.id, kind: 'hello', data: { name: this.name } });
+    if (!this.isHost) this._hello();
+  }
+  // keep knocking until the host lets us in (a single hello can get lost while the channel connects)
+  _hello() {
+    clearInterval(this.knock);
+    let tries = 0;
+    const knock = () => { if (this.closed || this.welcomed || tries++ > 8) return clearInterval(this.knock); this.chan.publish({ from: this.id, kind: 'hello', data: { name: this.name } }); };
+    knock(); this.knock = setInterval(knock, 2500);
+  }
+  _resume() {
+    const now = Date.now();
+    for (const p of this.peers.values()) p.lastSeen = now;
+    this.lastBeat = now;
+    this._heartbeat();
   }
 
   close() {
     if (this.closed) return; this.closed = true;
     try { this.chan.publish({ from: this.id, kind: 'bye' }); } catch {}
-    clearInterval(this.heart);
+    clearInterval(this.heart); clearInterval(this.knock);
+    document.removeEventListener('visibilitychange', this.onVis);
     for (const p of this.peers.values()) { try { p.pc && p.pc.close(); } catch {} }
     this.peers.clear();
     setTimeout(() => this.chan.close(), 300);
@@ -115,10 +142,14 @@ class Room {
 
   _heartbeat() {
     const now = Date.now();
+    // timers were frozen (phone asleep / app in the background): forgive the gap instead of dropping everyone
+    if (now - this.lastBeat > 6000) for (const p of this.peers.values()) p.lastSeen = now;
+    this.lastBeat = now;
     for (const [id, p] of this.peers) {
-      // relayed peers can't be seen by the data channel closing, so they ping over the channel
-      if (this.isRelay(id)) this.chan.publish({ from: this.id, to: id, kind: 'ping' });
-      if (now - p.lastSeen > 12000) this._dropPeer(id);
+      // everyone pings everyone they're linked to, over the direct link when it's up, else the channel
+      if (p.open && !p.relay && p.r && p.r.readyState === 'open') { try { p.r.send('{"k":"__ping"}'); } catch {} }
+      else this.chan.publish({ from: this.id, to: id, kind: 'ping' });
+      if (now - p.lastSeen > DROP_AFTER) this._dropPeer(id);
     }
   }
 
@@ -135,19 +166,24 @@ class Room {
     const p = this.peers.get(m.from);
     if (p) p.lastSeen = Date.now();
     switch (m.kind) {
-      case 'hello': // a new player wants in (only the host answers)
-        if (!this.isHost || this.peers.has(m.from)) return;
+      case 'hello': // a player wants in, or is coming back after a hiccup (only the host answers)
+        if (!this.isHost) return;
+        if (p && p.helloAt && Date.now() - p.helloAt < 4000) return; // repeat knock we're already handling
+        if (p) { try { p.pc && p.pc.close(); } catch {} this.peers.delete(m.from); } // reconnecting: start the link fresh
         this._addPeer(m.from, true);
+        this.peers.get(m.from).helloAt = Date.now();
         for (const h of this.joinHandlers) h(m.from, m.data || {});
         break;
       case 'welcome': // the host accepted us
         if (this.isHost) return;
-        this.hostId = m.from;
-        if (!this.peers.has(m.from)) this._addPeer(m.from, false);
+        this.hostId = m.from; this.welcomed = true; clearInterval(this.knock);
+        if (p) { try { p.pc && p.pc.close(); } catch {} this.peers.delete(m.from); }
+        this._addPeer(m.from, false);
         break;
       case 'sig': this._onSignal(m.from, m.data); break;
-      case 'msg': if (p) this._emit(m.data, m.from); break;
-      case 'ping': break;
+      case 'msg': if (p) this._emit(m.data, m.from); else if (this.isHost) this.chan.publish({ from: this.id, to: m.from, kind: 'rehello' }); break;
+      case 'ping': if (!p && this.isHost) this.chan.publish({ from: this.id, to: m.from, kind: 'rehello' }); break;
+      case 'rehello': if (!this.isHost) { this.welcomed = false; this._hello(); } break; // the host lost track of us: knock again
       case 'bye': this._dropPeer(m.from); break;
     }
   }
@@ -163,7 +199,7 @@ class Room {
     const wire = (dc) => {
       if (dc.label === 'u') peer.u = dc; else peer.r = dc;
       dc.onopen = () => { if (peer.r && peer.r.readyState === 'open') { peer.open = true; peer.relay = false; } };
-      dc.onmessage = ev => { peer.lastSeen = Date.now(); let msg; try { msg = JSON.parse(ev.data); } catch { return; } this._emit(msg, id); };
+      dc.onmessage = ev => { peer.lastSeen = Date.now(); let msg; try { msg = JSON.parse(ev.data); } catch { return; } if (msg.k !== '__ping') this._emit(msg, id); };
       dc.onclose = () => { if (this.peers.get(id) === peer && !this.closed) { peer.relay = true; peer.open = true; } }; // keep going over the relay
     };
     pc.ondatachannel = ev => wire(ev.channel);
@@ -228,7 +264,7 @@ export const TGNet = {
     if (code.length !== 4) throw new Error('Game codes are 4 letters.');
     const g = await backend.getGame(code);
     if (!g) throw new Error(`No game with code ${code}.`);
-    if (g.status !== 'lobby') throw new Error('That game has already started.');
+    if (g.status === 'ended') throw new Error('That game has ended.');
     const room = new Room(backend, code, false, name);
     await room.start();
     return room;

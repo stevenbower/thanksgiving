@@ -1546,7 +1546,7 @@ function updateCamera(dt, look = 0) {
 // who an enemy goes after: the nearest player still standing
 function targetOf(e) {
   let best = null, bd = Infinity;
-  for (const q of players) { if (q.dead) continue; const d = (q.x - e.x) ** 2 + (q.y - e.y) ** 2; if (d < bd) { bd = d; best = q; } }
+  for (const q of players) { if (q.dead || q.away) continue; const d = (q.x - e.x) ** 2 + (q.y - e.y) ** 2; if (d < bd) { bd = d; best = q; } }
   return best || me || players[0];
 }
 
@@ -3331,7 +3331,7 @@ function render() {
   for (const pr of props) if (!pr.flat) list.push([pr.y, () => pr.rock ? drawRock(pr) : drawSprite(pr.img, pr.x, pr.y + pr.d * 0.45, pr.h, false)]);
   for (const c of corpses) list.push([c.y - 2, () => drawCorpse(c)]);
   for (const e of enemies) list.push([e.y, () => drawEnemy(e)]);
-  for (const q of players) list.push([q.y, () => { player = q; drawPlayer(); if (NET) drawNameTag(q); player = me; }]);
+  for (const q of players) list.push([q.y, () => { player = q; if (q.away) ctx.globalAlpha = 0.4; drawPlayer(); ctx.globalAlpha = 1; if (NET) drawNameTag(q); player = me; }]);
   for (const q of players) if (q.spT > 0 && SP[CHARS[q.ch].special]) {
     list.push([q.y + 1, () => drawPlayerPowerFx(q)]);
     if (CHARS[q.ch].special === 'goalie') list.push([q.y - 1, () => drawGoalNet(q, false)]);
@@ -3455,7 +3455,7 @@ function drawNameTag(q) {
   const y = q.y - q.z - q.h - 20;
   ctx.font = `15px 'Lilita One', sans-serif`; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
   ctx.lineWidth = 4; ctx.strokeStyle = '#2b1a10'; ctx.strokeText(q.pname, q.x, y);
-  ctx.fillStyle = q === me ? '#ffd84a' : '#bfe6ff'; ctx.fillText(q.pname, q.x, y);
+  ctx.fillStyle = q === me ? '#ffd84a' : '#bfe6ff'; ctx.fillText(q.away ? `${q.pname} (reconnecting…)` : q.pname, q.x, y);
   if (q !== me && !q.dead) { const w = 40; ctx.fillStyle = '#2b1a10'; ctx.fillRect(q.x - w / 2 - 1, y + 5, w + 2, 6); ctx.fillStyle = '#5fd06a'; ctx.fillRect(q.x - w / 2, y + 6, w * Math.max(0, q.hp / q.maxHp), 4); }
 }
 function drawPlayer() {
@@ -3969,7 +3969,7 @@ const MAX_PLAYERS = CHAR_ORDER.length;
 const r2 = v => typeof v === 'number' ? (v === Infinity ? 1e9 : Math.round(v * 100) / 100) : v;
 const unInf = v => v === 1e9 ? Infinity : v;
 const K = {
-  pl: ['id', 'ch', 'pname', 'x', 'y', 'z', 'vx', 'vy', 'hp', 'maxHp', 'dir', 'flipX', 'frame', 'face', 'aim', 'gunAng', 'bodyAng', 'cur', 'fireCd', 'lean', 'sq', 'inv', 'dead', 'deadT', 'dashT', 'dashDir', 'chargeT', 'chargeWind', 'chargeDir', 'jumpT', 'chewT', 'breathT', 'hurtT', 'victoryT', 'lastFire', 'flash', 'speech', 'macT', 'wetT', 'spT', 'spinA'],
+  pl: ['id', 'ch', 'pname', 'x', 'y', 'z', 'vx', 'vy', 'hp', 'maxHp', 'dir', 'flipX', 'frame', 'face', 'aim', 'gunAng', 'bodyAng', 'cur', 'fireCd', 'lean', 'sq', 'inv', 'dead', 'deadT', 'dashT', 'dashDir', 'chargeT', 'chargeWind', 'chargeDir', 'jumpT', 'chewT', 'breathT', 'hurtT', 'victoryT', 'lastFire', 'flash', 'speech', 'macT', 'wetT', 'spT', 'spinA', 'away'],
   mine: ['ammo', 'bombs', 'scraps', 'canCd', 'chargeCd', 'chiliCd', 'roastCd', 'slimeCd', 'stompCd', 'stompWind', 'dashCd', 'bombCd', 'spCd'],
   en: ['id', 'type', 'x', 'y', 'z', 'vx', 'vy', 'hp', 'maxHp', 'dir', 'flipX', 'frame', 'act', 'face', 'sq', 'lean', 'flash', 'spawnT', 'spawnMax', 'leap', 'st', 'seed', 'sulkT', 'hypeT', 'downT', 'downMax', 'meltT', 'burnT', 'stuckT', 'cheese', 'fvx', 'danceT', 'sleepT', 'brawlT', 'rainbowT', 'pickT', 'signI', 'paintT', 'artI', 'paintC', 'held', 'thrownT'],
   bu: ['w', 'x', 'y', 'z', 'vx', 'vy', 'r', 'rot', 'seed', 'life', 'max'],
@@ -4172,8 +4172,8 @@ function clientUpdate(dt) {
   updateCorpses(dt);
   updateCamera(dt, isTouch && !mouse.active ? 0 : 1);
   shake = Math.max(0, shake - dt * 40);
-  // the host vanished
-  if (state === 'play' && performance.now() - NET.lastSnap > 8000) netLost('Lost connection to the host.');
+  // the host went quiet: keep trying for a while (they may have locked their phone) before giving up
+  if (state === 'play' && performance.now() - NET.lastSnap > 50000) netLost('Lost connection to the host.');
 }
 
 // ---------- lobby ----------
@@ -4181,7 +4181,7 @@ function playerName() { return (store.get('tg_pname', '') || '').trim(); }
 function setPlayerName(v) { store.set('tg_pname', String(v || '').trim().slice(0, 14)); }
 function lobbyBroadcast() {
   if (!NET || !NET.host) return;
-  const msg = { k: 'lobby', code: NET.room.code, roster: NET.roster, hostId: NET.room.id };
+  const msg = { k: 'lobby', code: NET.room.code, roster: NET.roster.filter(r => !r.away || Date.now() - r.away < 44000), hostId: NET.room.id, inGame: inNetGame() };
   NET.room.send(msg);
   renderLobby();
 }
@@ -4190,33 +4190,72 @@ function netAttach(room) {
   if (room.isHost) {
     NET.roster = [{ id: room.id, name: room.name, ch: null }];
     room.onJoin((id, info) => {
-      if (state !== 'lobby' || NET.roster.length >= MAX_PLAYERS) { room.send({ k: 'reject', why: state !== 'lobby' ? 'That game has already started.' : 'That game is full.' }, id); return; }
+      const old = NET.roster.find(x => x.id === id);
+      NET.evq.set(id, []); NET.lastSent.delete(id);
+      if (old) {
+        // the same player coming back after a hiccup: pick up right where they were
+        old.away = 0;
+        const q = players && players.find(x => x.id === id); if (q) { q.away = false; q.inv = Math.max(q.inv, 1.5); }
+        setTimeout(() => { if (inNetGame() && old.ch) sendStart(id); else lobbyBroadcast(); }, 400);
+        return;
+      }
+      if (NET.roster.length >= MAX_PLAYERS) { room.send({ k: 'reject', why: 'That game is full.' }, id); return; }
       NET.roster.push({ id, name: String(info.name || 'Player').slice(0, 14), ch: null });
-      NET.evq.set(id, []);
-      window.TGNet.setStatus(room.code, 'lobby', NET.roster.length);
-      setTimeout(lobbyBroadcast, 300);
+      window.TGNet.setStatus(room.code, inNetGame() ? 'playing' : 'lobby', NET.roster.length);
+      setTimeout(lobbyBroadcast, 300); // (mid-game joiners get the lobby too, to pick a character)
     });
     room.onLeave(id => {
-      const r = NET.roster.find(x => x.id === id);
-      NET.roster = NET.roster.filter(x => x.id !== id); NET.evq.delete(id); NET.inputs.delete(id);
+      // give them a while to come back (phone locked, switched apps, network blip) before freeing their spot
+      const r = NET.roster.find(x => x.id === id); if (!r) return;
+      r.away = Date.now();
+      const q = players && players.find(x => x.id === id); if (q) { q.away = true; q.inv = 999; }
       if (state === 'lobby') lobbyBroadcast();
-      else if (players) { const q = players.find(x => x.id === id); if (q) { floatText(q.x, q.y - 120, `${q.pname} left`, '#fff4dc', 2, 20); players = players.filter(x => x !== q); } }
+      setTimeout(() => {
+        if (!NET || !r.away || Date.now() - r.away < 44000) return;
+        NET.roster = NET.roster.filter(x => x !== r); NET.evq.delete(id); NET.inputs.delete(id);
+        if (state === 'lobby') lobbyBroadcast();
+        else if (players) { const pl = players.find(x => x.id === id); if (pl) { floatText(pl.x, pl.y - 120, `${pl.pname} left`, '#fff4dc', 2, 20); players = players.filter(x => x !== pl); } lobbyBroadcast(); }
+      }, 45000);
     });
   } else {
     room.onLeave(id => { if (id === room.hostId) netLost('The host left the game.'); });
   }
   room.on((msg, from) => netMessage(msg, from));
 }
+const inNetGame = () => state === 'play' || state === 'paused' || state === 'over';
+// bring a player into the running game (late joiner, or someone reconnecting)
+function sendStart(id) { NET.room.send({ k: 'start', roster: NET.roster.filter(r => r.ch), level: wave }, id); }
+function hostAddLate(r) {
+  if (!players.find(q => q.id === r.id)) {
+    const buddy = players.find(q => !q.dead) || players[0];
+    const q = makePlayer(r.ch, r.id, r.name, 0, 1);
+    if (buddy) { q.x = clamp(buddy.x + rand(-90, 90), 80, ARENA.w - 80); q.y = clamp(buddy.y + rand(40, 90), 100, ARENA.h - 80); }
+    q.inv = 2.5; players.push(q);
+    floatText(q.x, q.y - 120, `${r.name} joined!`, '#7dff8a', 2, 22); Sfx.pickup();
+  }
+  NET.evq.set(r.id, []);
+  sendStart(r.id);
+}
 function netMessage(msg, from) {
   if (!NET) return;
   if (NET.host) {
     if (msg.k === 'in' && state !== 'lobby') hostOnInput(from, msg.i);
     else if (msg.k === 'pick' && state === 'lobby') { lobbyPick(from, msg.ch); }
+    else if (msg.k === 'pick' && inNetGame()) { // joining a game in progress
+      const r = NET.roster.find(x => x.id === from);
+      if (r && !r.ch && lobbyPick(from, msg.ch)) hostAddLate(r);
+    }
     else if (msg.k === 'hi') lobbyBroadcast();
     return;
   }
   if (from !== NET.room.hostId) return;
-  if (msg.k === 'lobby') { NET.roster = msg.roster; NET.room.code = msg.code; if (state !== 'lobby' && state !== 'play') { state = 'lobby'; show('lobby'); } renderLobby(); }
+  if (msg.k === 'lobby') {
+    NET.roster = msg.roster; NET.room.code = msg.code; NET.inGame = msg.inGame;
+    const mine = msg.roster.find(r => r.id === NET.room.id);
+    // mid-game: only someone still choosing sits in the lobby; everyone playing just keeps the roster
+    if (state !== 'lobby' && state !== 'play' && state !== 'paused' && !(msg.inGame && mine && mine.ch)) { state = 'lobby'; show('lobby'); }
+    renderLobby();
+  }
   else if (msg.k === 'reject') netLost(msg.why);
   else if (msg.k === 'start') { NET.roster = msg.roster; beginNetGame(msg.level); }
   else if (msg.k === 'snap' && (state === 'play' || state === 'paused')) clientApply(msg);
@@ -4225,8 +4264,8 @@ function netMessage(msg, from) {
 function lobbyPick(id, ch) {
   if (!CHARS[ch]) return;
   const r = NET.roster.find(x => x.id === id); if (!r) return;
-  if (NET.roster.some(x => x.ch === ch && x.id !== id)) return; // each character only once
-  r.ch = ch; lobbyBroadcast();
+  if (NET.roster.some(x => x.ch === ch && x.id !== id)) return false; // each character only once
+  r.ch = ch; lobbyBroadcast(); return true;
 }
 function renderLobby() {
   if (!NET) return;
@@ -4254,7 +4293,7 @@ function renderLobby() {
   $('lobbyStart').disabled = !ready;
   $('lobbyMsg').textContent = NET.host
     ? (NET.roster.length < 2 ? 'Share the code — waiting for players to join…' : ready ? `${NET.roster.length} players ready!` : 'Waiting for everyone to pick a character…')
-    : 'Pick a character. The host starts the game.';
+    : NET.inGame ? 'A game is already going. Pick a character to jump right in!' : 'Pick a character. The host starts the game.';
   $('lobbyLinks').textContent = NET.room.linkInfo().filter(l => !l.direct).length ? 'Some players are connected through the relay (a little more lag).' : '';
 }
 function beginNetGame(level) {
@@ -4297,7 +4336,12 @@ async function onlineNet() {
   const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Still loading online features. Check your connection and try again.')), 60000));
   return Promise.race([window.TGNetLoad, timeout]);
 }
+let netBusy = false;
 async function hostGame() {
+  if (netBusy || NET) return;
+  netBusy = true; try { await hostGameInner(); } finally { netBusy = false; }
+}
+async function hostGameInner() {
   const name = $('pnameMulti').value.trim(); if (!name) { $('multiMsg').textContent = 'Enter your name first.'; $('pnameMulti').focus(); return; }
   setPlayerName(name);
   $('multiMsg').textContent = 'Creating a game…';
@@ -4309,6 +4353,10 @@ async function hostGame() {
   } catch (e) { $('multiMsg').textContent = e.message || String(e); }
 }
 async function joinGame() {
+  if (netBusy || NET) return;
+  netBusy = true; try { await joinGameInner(); } finally { netBusy = false; }
+}
+async function joinGameInner() {
   const name = $('pnameMulti').value.trim(); if (!name) { $('multiMsg').textContent = 'Enter your name first.'; $('pnameMulti').focus(); return; }
   setPlayerName(name);
   const code = $('joinCode').value;
@@ -4323,7 +4371,7 @@ async function joinGame() {
     const wait = setInterval(() => {
       if (!NET || NET.room !== room) return clearInterval(wait);
       if (state === 'lobby') { clearInterval(wait); $('multiMsg').textContent = ''; return; }
-      if (performance.now() - t0 > 12000) { clearInterval(wait); netLost("Couldn't reach the host. Check the code and try again."); }
+      if (performance.now() - t0 > 25000) { clearInterval(wait); netLost("Couldn't reach the host. Check the code and try again."); }
     }, 300);
   } catch (e) { $('multiMsg').textContent = e.message || String(e); }
 }
@@ -4359,7 +4407,9 @@ async function showScores(mode) {
 // ---------- main loop ----------
 let last = performance.now();
 function frame(now) {
-  let dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const gap = now - last;
+  let dt = Math.min(0.05, gap / 1000); last = now;
+  if (NET && gap > 1500) NET.lastSnap = performance.now(); // we were asleep in the background; that's not the host's fault
   if (NET && !NET.host && (state === 'play' || state === 'paused')) clientUpdate(dt);
   else if (state === 'play' || state === 'over' || (NET && state === 'paused')) {
     if (state === 'play' || state === 'paused') { update(dt); netHostTick(dt); }
@@ -4368,6 +4418,11 @@ function frame(now) {
     }
   }
   render();
+  // waiting on the host: say so instead of looking frozen
+  if (NET && !NET.host && (state === 'play' || state === 'paused') && performance.now() - NET.lastSnap > 2500) {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = 'rgba(20,10,5,.55)'; ctx.fillRect(0, VH / 2 - 34, VW, 68);
+    hudText('Reconnecting to the host…', VW / 2, VH / 2 + 8, 22, '#ffd84a', 'center');
+  }
   requestAnimationFrame(frame);
 }
 // opened from an invite link (?join=CODE)
